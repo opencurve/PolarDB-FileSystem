@@ -138,7 +138,7 @@ static int pfs_curvedev_get_path(pfs_dev_t *dev, char* path) {
     char *p = strstr(path, "@@");
     if (p == NULL) {
         errno = EINVAL;
-        ERR_RETVAL(EINVAL);
+        return -1;
     }
     strcpy(path, p+1);
     path[0] = '/';
@@ -155,7 +155,7 @@ pfs_curvedev_increase_epoch_i(const char *path) {
         } else {
             errno = EIO;
         }
-        ERR_RETVAL(errno);
+        return -1;
     }
     return 0;
 }
@@ -281,7 +281,7 @@ pfs_curvedev_info(pfs_dev_t *dev, struct pbdinfo *pi)
     if (size < 0) {
         errno = EIO;
         pfs_etrace("curve failed to get disk size, errno=%d\n", errno);
-        ERR_RETVAL(errno);
+        return -1;
     }
 
     pi->pi_pbdno = 0;
@@ -348,10 +348,10 @@ pfs_curvedev_aio_callback(struct CurveAioContext* ctx)
 
     if (iocb->ctx.ret < 0) {
         if (-LIBCURVE_ERROR::EPOCH_TOO_OLD == iocb->ctx.ret) {
-            io->io_error = -EROFS;
+            io->io_error = -1;
             errno = EROFS;
         } else {
-            io->io_error = -EIO;
+            io->io_error = -1;
             errno = EIO;
         }
     } else {
