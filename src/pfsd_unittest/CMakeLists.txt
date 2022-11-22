@@ -72,4 +72,19 @@ target_link_libraries(sdk_demo
     -Wl,--end-group
 )
 
+add_executable(
+	mount_two_pbds
+	mount_two_pbds.cc
+)
+target_link_libraries(mount_two_pbds
+    gtest
+    -Wl,--start-group
+    -Wl,--no-as-needed
+    pfs
+    pfsd
+    pthread
+    -Wl,--end-group
+)
+
+
 
