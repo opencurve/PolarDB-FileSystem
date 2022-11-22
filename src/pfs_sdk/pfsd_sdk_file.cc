@@ -404,7 +404,7 @@ pfsd_normalize_path(char *pbdpath)
 }
 
 void
-pfsd_file_cleanup(int conn_id)
+pfsd_close_all_files(struct mountargs *mp)
 {
 	//The function can not be protected within fdtbl_mtx because
 	//it will be locked in pfsd_close_file.
@@ -413,7 +413,9 @@ pfsd_file_cleanup(int conn_id)
 	pthread_mutex_lock(&fdtbl_mtx);
 	for (int i = 0; i < PFSD_MAX_NFD; ++i) {
 		file = fd_to_file(i);
-		if (file && file->f_conn_id == conn_id) {
+		// Here we only check f_mp because mp->conn_id may
+		// already have been closed.
+		if (file && file->f_mp == mp) {
 			pthread_rwlock_wrlock(&file->f_rwlock);
 			file->f_conn_id = -1;
 			file->f_mp = NULL;

@@ -56,7 +56,7 @@ pfsd_file_t *
 	pfsd_get_file(int fd, bool writelock);
 void	pfsd_put_file(pfsd_file_t *file, struct mountargs *mp);
 int	pfsd_close_file(pfsd_file_t *file);
-void	pfsd_file_cleanup(int conn_id);
+void	pfsd_close_all_files(struct mountargs *mp);
 
 /* dir */
 bool	pfsd_chdir_begin();

@@ -276,6 +276,7 @@ pfsd_umount_force(const char *pbdname)
 	pfs_umount_prepare(pbdname, mp);
 	int err = pfsd_chnl_close(mp->conn_id, true);
 	if (err == 0) {
+		pfsd_close_all_files(mp);
 		pfs_umount_post(pbdname, mp);
 		PFSD_CLIENT_LOG("umount success for %s", pbdname);
 	} else {
@@ -295,6 +296,7 @@ pfsd_umount(const char *pbdname)
 	CHECK_MOUNT2(mp, pbdname, WRLOCK);
 	int err = pfsd_chnl_close(mp->conn_id, false);
 	if (err == 0) {
+		pfsd_close_all_files(mp);
 		pfs_umount_post(pbdname, mp);
 		PFSD_CLIENT_LOG("umount success for %s", pbdname);
 	} else {
@@ -605,6 +607,11 @@ pfsd_creat(const char *pbdpath, mode_t mode)
 		return -1; \
 	} \
 	mp = file->f_mp; \
+	if (mp == NULL) { \
+		pfsd_put_file(file, NULL); \
+		errno = ENODEV; \
+		return -1; \
+	} \
 	pfs_mountargs_rdlock(mp); \
 } while(0)
 
