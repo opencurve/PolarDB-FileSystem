@@ -22,6 +22,7 @@
 #include "pfsd_common.h"
 #include "pfsd_sdk.h"
 #include "pfsd_sdk_file.h"
+#include "pfsd_sdk_mount.h"
 
 #define PFSD_MAX_NFD 102400
 
@@ -57,16 +58,22 @@ void pfsd_sdk_file_init()
 	err |= pthread_mutex_init(&fdtbl_mtx, &attr);
 	err |= pthread_mutexattr_destroy(&attr);
 	assert (err == 0);
+	pthread_rwlock_init(&sdk_work_dir_rwlock, NULL);
+}
 
-	if (fdtbl_nopen != 0) {
-		//This is atfork in subprocess or after umount in master process
-		for (int i = 0; i < PFSD_MAX_NFD; ++i) {
-			file = fd_to_file(i);
-			if (file)
-				pfsd_close_file(file);
-		}
-	}
-	PFSD_ASSERT(fdtbl_nopen == 0);
+void pfsd_sdk_file_reinit()
+{
+	pthread_mutexattr_t attr;
+	int err = pthread_mutexattr_init(&attr);
+	pfsd_file_t *file = NULL;
+	err |= pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+	err |= pthread_mutex_init(&fdtbl_mtx, &attr);
+	err |= pthread_mutexattr_destroy(&attr);
+	assert (err == 0);
+
+	fdtbl_free_last = -1;
+	memset(fdtbl, 0, sizeof(*fdtbl));
+	fdtbl_nopen = 0;
 
 	pthread_rwlock_init(&sdk_work_dir_rwlock, NULL);
 }
@@ -83,6 +90,7 @@ pfsd_alloc_file()
 	pthread_mutex_init(&f->f_lseek_lock, NULL);
 	f->f_fd = -1;
 	f->f_inode = -1;
+        f->f_conn_id = -1;
 	return f;
 }
 
@@ -177,7 +185,7 @@ pfsd_get_file(int fd, bool writelock)
 }
 
 void
-pfsd_put_file(pfsd_file_t *f)
+pfsd_put_file(pfsd_file_t *f, struct mountargs *mp)
 {
 	if (f) {
 		pthread_rwlock_unlock(&f->f_rwlock);
@@ -185,6 +193,9 @@ pfsd_put_file(pfsd_file_t *f)
 		pthread_mutex_lock(&fdtbl_mtx);
 		--f->f_refcnt;
 		pthread_mutex_unlock(&fdtbl_mtx);
+	}
+	if (mp) {
+		pfs_mountargs_unlock(mp);
 	}
 }
 
@@ -210,6 +221,28 @@ pfsd_close_file(pfsd_file_t *f)
 
 	return err;
 }
+
+int
+pfsd_close_file_locked(pfsd_file_t *f)
+{
+	if (!f)
+		return -EINVAL;
+
+	if (f->f_fd < 0 || f->f_fd >= PFSD_MAX_NFD)
+		return -EBADF;
+
+	int err = -EAGAIN;
+
+	if (f->f_refcnt <= 1) {
+		err = 0;
+		fd_put_free(f->f_fd);
+	}
+	if (err == 0)
+		pfsd_free_file(f);
+
+	return err;
+}
+
 
 static pthread_mutex_t pfsd_chdir_mtx = PTHREAD_MUTEX_INITIALIZER;
 
@@ -371,22 +404,21 @@ pfsd_normalize_path(char *pbdpath)
 }
 
 void
-pfsd_file_cleanup()
+pfsd_file_cleanup(int conn_id)
 {
 	//The function can not be protected within fdtbl_mtx because
 	//it will be locked in pfsd_close_file.
 	int ret = 0;
 	pfsd_file_t *file;
+	pthread_mutex_lock(&fdtbl_mtx);
 	for (int i = 0; i < PFSD_MAX_NFD; ++i) {
 		file = fd_to_file(i);
-		if (file) {
-			ret = pfsd_close_file(file);
-			//We do not check whether ret is zero but warn.
-			if (ret < 0)
-				PFSD_CLIENT_ELOG("close fd %d err in cleanup, "
-				     "error: %d", i, ret);
-			else
-				PFSD_CLIENT_ELOG("close fd %d in cleanup", i);
+		if (file && file->f_conn_id == conn_id) {
+			pthread_rwlock_wrlock(&file->f_rwlock);
+			file->f_conn_id = -1;
+			file->f_mp = NULL;
+			pthread_rwlock_unlock(&file->f_rwlock);
 		}
 	}
+	pthread_mutex_unlock(&fdtbl_mtx);
 }

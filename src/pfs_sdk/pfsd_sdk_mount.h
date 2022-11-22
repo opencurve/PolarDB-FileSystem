@@ -17,15 +17,41 @@
 #ifndef PFSD_MOUNT_SHARE_H_
 #define PFSD_MOUNT_SHARE_H_
 
-void 	*pfs_mount_prepare(const char *cluster, const char *pbdname,
-    int host_id, int flags);
+#include <sys/queue.h>
+
+typedef struct mountargs {
+	TAILQ_ENTRY(mountargs) link;
+	pthread_rwlock_t rwlock;
+	int meta_lock_fd;
+	int hostid_lock_fd;
+	int flags;
+	int host_id;
+	int conn_id;
+	int on_list;
+	int ref_count;
+	char pbd_name[PFS_MAX_PBDLEN];
+} mountargs_t;
+
+enum {RDLOCK, WRLOCK};
+
+struct mountargs *pfs_mount_prepare(const char *cluster, const char *pbdname,
+	int host_id, int flags);
+int	pfs_remount_prepare(struct mountargs *ma, const char *cluster,
+			const char *pbdname, int host_id, int flags);
 void 	pfs_mount_post(void *handle, int err);
-void 	pfs_mount_atfork_child(void *handle);
+void 	pfs_mount_atfork_child(void);
 void 	*pfs_remount_prepare(const char *cluster, const char *pbdname,
     int host_id, int flags);
 void 	pfs_remount_post(void *handle, int err);
 
 void	pfs_umount_prepare(const char *pbdname, void *handle);
 void	pfs_umount_post(const char *pbdname, void *handle);
-
+struct mountargs *pfs_mountargs_find(const char *pbdname, int lock_mode);
+void	pfs_mountargs_put(struct mountargs *mp);
+int	pfs_mountargs_foreach(int (*cb)(struct mountargs *, void *arg),
+		void *arg);
+int	pfs_mountargs_exists(const char *pbdname);
+int	pfs_mountargs_rdlock(struct mountargs *mp);
+int	pfs_mountargs_wrlock(struct mountargs *mp);
+int	pfs_mountargs_unlock(struct mountargs *mp);
 #endif //PFSD_MOUNT_SHARE_H_

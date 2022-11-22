@@ -34,52 +34,43 @@
 #include "pfsd_chnl_shm.h"
 
 /* init once */
-static pthread_mutex_t s_init_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t pfs_init_mtx = PTHREAD_MUTEX_INITIALIZER;
 static int s_inited = 0;
-
-/* connect id */
-static int s_connid = -1;
-
-/* about hostid */
-static void *s_mount_local_info = NULL;
-
-static char s_pbdname[PFS_MAX_NAMELEN];
-static int s_mnt_flags = 0;
-static int s_mnt_hostid = -1;
-int s_mount_epoch = 0;
 
 static int s_mode = PFSD_SDK_PROCESS;
 static char s_svraddr[PFS_MAX_PATHLEN];
 static int s_timeout_ms = 20 * 1000;
 static int s_remount_timeout_ms = 2000 * 1000;
 
-#define RESET_CONN() do { \
-	s_connid = -1;\
-	s_inited = 0;\
-	s_pbdname[0] = 0;\
-	s_mnt_flags = 0;\
-	s_mount_epoch = 0;\
-	s_mnt_hostid = -1;\
-} while (0)
-
-/* Don't check it for multi process.
- * After remount, s_mnt_flags will be modified.
- * But it's not shared.
- */
-#define CHECK_WRITABLE() do { \
-	if (s_mode == PFSD_SDK_THREADS && !pfsd_writable(s_mnt_flags)) { \
+#define CHECK_WRITABLE(mp) do { \
+	if (!pfsd_writable((mp)->flags)) { \
+		pfs_mountargs_put(mp); \
 		errno = EROFS; \
 		return -1; \
 	} \
 } while(0)
 
-#define CHECK_MOUNT(pbdname) do { \
-	if (strncmp(s_pbdname, pbdname, sizeof(s_pbdname)) != 0) { \
-		PFSD_CLIENT_ELOG("No such device %s, exists %s", pbdname, s_pbdname);\
+#define CHECK_MOUNT2(mp, pbdname, mode) do { \
+	mp = pfs_mountargs_find((pbdname), mode); \
+	if (mp == NULL) { \
+		PFSD_CLIENT_ELOG("No such device %s mounted", (pbdname));\
 		errno = ENODEV; \
 		return -1; \
 	} \
 } while(0)
+
+#define CHECK_MOUNT(mp, pbdname) CHECK_MOUNT2(mp, pbdname, RDLOCK) 
+
+#define CHECK_MOUNT_RETVAL(mp, pbdname, retval) do { \
+	mp = pfs_mountargs_find((pbdname), RDLOCK); \
+	if (mp == NULL) { \
+		PFSD_CLIENT_ELOG("No such device %s mounted", (pbdname));\
+		errno = ENODEV; \
+		return retval; \
+	} \
+} while(0)
+
+#define PUT_MOUNT(mp) pfs_mountargs_put((mp))
 
 static ssize_t pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len,
 	off_t off);
@@ -105,6 +96,7 @@ pfsd_set_svr_addr(const char *svraddr, size_t len)
 	}
 
 	strncpy(s_svraddr, svraddr, len);
+	s_svraddr[len-1] = '\0';
 }
 
 void
@@ -118,12 +110,6 @@ pfsd_set_connect_timeout(int timeout_ms)
 	s_timeout_ms = timeout_ms;
 }
 
-static void
-pfsd_mount_atfork_child_init()
-{
-	pfs_mount_atfork_child(s_mount_local_info);
-}
-
 /* when child process is ready */
 void
 pfsd_atfork_child_post()
@@ -134,28 +120,26 @@ pfsd_atfork_child_post()
 	gettimeofday(&now, NULL);
 	srand((unsigned)((now.tv_sec + now.tv_usec) ^ getpid()));
 
-	pfsd_sdk_file_init();
-	pfsd_mount_atfork_child_init();
+	pfsd_sdk_file_reinit();
+	pfs_mount_atfork_child();
 }
 
 int
 pfsd_sdk_init(int mode, const char *svraddr, int timeout_ms,
     const char *cluster, const char *pbdname, int host_id, int flags)
 {
-
-	pfsd_chnl_shm_client_init(); /* ! forced link pfsd_chnl_shm.o in libpfsd.a */
-
 	int conn_id;
-	void *mp = NULL;
+	struct mountargs *mp = NULL;
 
 	if (cluster == NULL)
 		cluster = "polarstore";
 
-	pthread_mutex_lock(&s_init_mtx);
+	pfsd_chnl_shm_client_init(); /* ! forced link pfsd_chnl_shm.o in libpfsd.a */
+
+	pthread_mutex_lock(&pfs_init_mtx);
 	if (s_inited == 1) {
-		PFSD_CLIENT_LOG("sdk may be init by other threads");
-		pthread_mutex_unlock(&s_init_mtx);
-		return 0;
+		PFSD_CLIENT_LOG("sdk has already been initialized by other threads");
+		goto mount_vol;
 	}
 
 	if (flags & MNTFLG_TOOL) {
@@ -175,59 +159,54 @@ pfsd_sdk_init(int mode, const char *svraddr, int timeout_ms,
 		}
 	}
 
-	s_pbdname[0] = '\0';
-	s_mnt_flags = 0;
 	pfsd_sdk_file_init();
 
 	if (s_svraddr[0] == '\0') {
-		strncpy(s_svraddr, PFSD_USER_PID_DIR, PFS_MAX_PATHLEN);
+		if (svraddr[0] == '\0') {
+			strncpy(s_svraddr, PFSD_USER_PID_DIR, sizeof(s_svraddr));
+		} else {
+			strncpy(s_svraddr, svraddr, sizeof(s_svraddr));
+		}
+		s_svraddr[sizeof(s_svraddr)-1] = '\0';
 	}
 
 	srand(time(NULL));
 
+	if (mode == PFSD_SDK_PROCESS) {
+		pthread_atfork(NULL, NULL, pfsd_atfork_child_post);
+	}
+
+	s_inited = 1;
+
+mount_vol:
+	if (pfs_mountargs_exists(pbdname)) {
+		PFSD_CLIENT_ELOG("pbd %s is already mounted", pbdname);
+		pthread_mutex_unlock(&pfs_init_mtx);
+		return -1;
+	}
+
 	/* local hostid lock */
 	errno = 0;
 	mp = pfs_mount_prepare(cluster, pbdname, host_id, flags);
-	if (mp == NULL && errno != 0) {
+	if (mp == NULL) {
 		PFSD_CLIENT_ELOG("pfs_mount_prepare failed, maybe hostid %d used, err %s", host_id, strerror(errno));
 		goto failed;
 	}
 
-	conn_id = pfsd_chnl_connect(svraddr, cluster, timeout_ms, pbdname, host_id, flags);
+	conn_id = pfsd_chnl_connect(s_svraddr, cluster, timeout_ms, pbdname, host_id, flags);
 	PFSD_CLIENT_LOG("pfsd_chnl_connect %s", conn_id > 0 ? "success" : "failed");
 	if (conn_id <= 0)
 		goto failed;
 
-	strncpy(s_pbdname, pbdname, sizeof(s_pbdname));
-	s_mnt_flags = flags;
-	s_mnt_hostid = host_id;
-
-	s_connid = conn_id;
-	s_mount_local_info = mp;
-
-	if (mode == PFSD_SDK_PROCESS) {
-		static bool registered_at_fork = false;
-		if (!registered_at_fork) {
-			pthread_atfork(NULL, NULL, pfsd_atfork_child_post);
-			registered_at_fork = true;
-		}
-	}
-
-	if (mp)
-		pfs_mount_post(mp, 0);
-
-	s_inited = 1;
-	pthread_mutex_unlock(&s_init_mtx);
+	mp->conn_id = conn_id;
+	pfs_mount_post(mp, 0);
+	pthread_mutex_unlock(&pfs_init_mtx);
 	return 0;
 
 failed:
 	if (mp)
 		pfs_mount_post(mp, -1);
-
-	s_mount_local_info = NULL;
-	RESET_CONN();
-
-	pthread_mutex_unlock(&s_init_mtx);
+	pthread_mutex_unlock(&pfs_init_mtx);
 	return -1;
 }
 
@@ -235,8 +214,8 @@ failed:
 	if (rsp->error == ESTALE) { \
 		PFSD_CLIENT_LOG("Stale request, rsp type %d!!!", rsp->type); \
 		rsp->error = 0; \
-		pfsd_chnl_update_meta(s_connid, req->mntid); \
-		pfsd_chnl_buffer_free(s_connid, req, rsp, NULL, pfsd_tolong(ch)); \
+		pfsd_chnl_update_meta(conn_id, req->mntid); \
+		pfsd_chnl_buffer_free(conn_id, req, rsp, NULL, pfsd_tolong(ch)); \
 		goto retry;\
 	} \
 } while(0)\
@@ -250,16 +229,19 @@ pfsd_mount(const char *cluster, const char *pbdname, int hostid, int flags)
 int
 pfsd_increase_epoch(const char *pbdname)
 {
-	CHECK_MOUNT(pbdname);
-
+	struct mountargs *mp = NULL;
 	int err = 0;
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	pfsd_response_t *rsp = NULL;
+	int conn_id = -1;
 
+	CHECK_MOUNT(mp, pbdname);
+	conn_id = mp->conn_id;
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req, 0, (void**)&rsp,
+	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, 0, (void**)&rsp,
 	    NULL, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -270,7 +252,7 @@ retry:
 	req->type = PFSD_REQUEST_INCREASEEPOCH;
 	strncpy(req->i_req.g_pbd, pbdname, PFS_MAX_PBDLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
+	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
 	if (rsp->error != 0) {
@@ -278,31 +260,28 @@ retry:
 		err = -1;
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, NULL, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return err;
 }
 
 int
 pfsd_umount_force(const char *pbdname)
 {
+	struct mountargs *mp = NULL;
 	PFSD_CLIENT_LOG("pbdname %s", pbdname);
-	CHECK_MOUNT(pbdname);
 
-	if (s_mount_local_info)
-		pfs_umount_prepare(pbdname, s_mount_local_info);
+	CHECK_MOUNT2(mp, pbdname, WRLOCK);
 
-	int err = pfsd_chnl_close(s_connid, true);
+	pfs_umount_prepare(pbdname, mp);
+	int err = pfsd_chnl_close(mp->conn_id, true);
 	if (err == 0) {
-		RESET_CONN();
-
-		if (s_mount_local_info) {
-			pfs_umount_post(pbdname, s_mount_local_info);
-			s_mount_local_info = NULL;
-		}
+		pfs_umount_post(pbdname, mp);
 		PFSD_CLIENT_LOG("umount success for %s", pbdname);
 	} else {
 		PFSD_CLIENT_ELOG("umount failed for %s", pbdname);
 	}
+	PUT_MOUNT(mp);
 
 	return err;
 }
@@ -310,44 +289,41 @@ pfsd_umount_force(const char *pbdname)
 int
 pfsd_umount(const char *pbdname)
 {
+	struct mountargs *mp = NULL;
 	PFSD_CLIENT_LOG("pbdname %s", pbdname);
-	CHECK_MOUNT(pbdname);
 
-	if (s_mount_local_info)
-		pfs_umount_prepare(pbdname, s_mount_local_info);
-
-	int err = pfsd_chnl_close(s_connid, false);
+	CHECK_MOUNT2(mp, pbdname, WRLOCK);
+	int err = pfsd_chnl_close(mp->conn_id, false);
 	if (err == 0) {
-		RESET_CONN();
-
-		if (s_mount_local_info) {
-			pfs_umount_post(pbdname, s_mount_local_info);
-			s_mount_local_info = NULL;
-		}
+		pfs_umount_post(pbdname, mp);
 		PFSD_CLIENT_LOG("umount success for %s", pbdname);
 	} else {
 		PFSD_CLIENT_ELOG("umount failed for %s", pbdname);
 	}
-
+	PUT_MOUNT(mp);
 	return err;
 }
 
 int
 pfsd_remount(const char *cluster, const char *pbdname, int hostid, int flags)
 {
-	void *mp;
+	struct mountargs *mp = NULL;;
 	int res;
 
-	CHECK_MOUNT(pbdname);
+	CHECK_MOUNT2(mp, pbdname, WRLOCK);
 
-	if (hostid != s_mnt_hostid) {
-		PFSD_CLIENT_ELOG("pfs_remount with diff hostid %d, expect %d", hostid, s_mnt_hostid);
+	if (hostid != mp->host_id) {
+		PFSD_CLIENT_ELOG("pfs_remount with diff hostid %d, expect %d",
+				 hostid, mp->host_id);
+		PUT_MOUNT(mp);
 		errno = EINVAL;
 		return -1;
 	}
 
-	if (s_mnt_flags & MNTFLG_WR) {
-		PFSD_CLIENT_ELOG("pfs_remount no need, already rw mount: %#x", s_mnt_flags);
+	if (mp->flags & MNTFLG_WR) {
+		PFSD_CLIENT_ELOG("pfs_remount no need, already rw mount: %#x",
+				 mp->flags);
+		PUT_MOUNT(mp);
 		errno = EINVAL;
 		return -1;
 	}
@@ -356,57 +332,65 @@ pfsd_remount(const char *cluster, const char *pbdname, int hostid, int flags)
 		cluster = "polarstore";
 
 	errno = 0;
-	mp = pfs_remount_prepare(cluster, pbdname, hostid, flags);
-	if (mp == NULL && errno != 0) {
+	if (pfs_remount_prepare(mp, cluster, pbdname, hostid, flags)) {
 		PFSD_CLIENT_ELOG("pfs_remount_prepare failed, maybe hostid %d used, err %s", hostid, strerror(errno));
 		goto failed;
 	}
 	/* reconnect, use same connid */
-	res = pfsd_chnl_reconnect(s_connid, cluster, s_remount_timeout_ms, pbdname, hostid, flags);
+	res = pfsd_chnl_reconnect(mp->conn_id, cluster, s_remount_timeout_ms, pbdname, hostid, flags);
 	if (res == 0) {
-		s_mnt_flags = flags;
-		free(s_mount_local_info);
-		s_mount_local_info = mp;
+		mp->flags = flags;
 	} else {
 		goto failed;
 	}
 
-	if (mp)
-		pfs_remount_post(mp, 0);
+	pfs_remount_post(mp, 0);
+	PUT_MOUNT(mp);
 
 	return 0;
 
 failed:
-	if (mp)
+	if (mp) {
 		pfs_remount_post(mp, -1);
+		PUT_MOUNT(mp);
+	}
 
 	return -1;
+}
+
+static int
+abort_conn(struct mountargs *mp, void *arg)
+{
+	int pid = (int)(intptr_t)arg;
+	return pfsd_chnl_abort(mp->conn_id, pid);
 }
 
 int
 pfsd_abort_request(pid_t pid)
 {
-	if (s_connid <= 0) {
-		PFSD_CLIENT_ELOG("SDK not inited successful\n");
-		errno = ENODEV;
+	int rc = pfs_mountargs_foreach(abort_conn, (void *)(intptr_t)pid);
+	if (rc)
 		return -1;
-	}
-	return pfsd_chnl_abort(s_connid, pid);
+	return 0;
 }
 
 int
 pfsd_mount_growfs(const char *pbdname)
 {
-	CHECK_MOUNT(pbdname);
+	struct mountargs *mp = NULL;
 
+	CHECK_MOUNT(mp, pbdname);
+
+	const int conn_id = mp->conn_id;
 	int err = 0;
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	pfsd_response_t *rsp = NULL;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req, 0, (void**)&rsp,
+	if (pfsd_chnl_buffer_alloc(mp->conn_id, 0, (void**)&req, 0, (void**)&rsp,
 	    NULL, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -417,7 +401,7 @@ retry:
 	req->type = PFSD_REQUEST_GROWFS;
 	strncpy(req->g_req.g_pbd, pbdname, PFS_MAX_PBDLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
+	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
 	if (rsp->error != 0) {
@@ -425,13 +409,16 @@ retry:
 		err = -1;
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, NULL, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return err;
 }
 
 int
 pfsd_rename(const char *oldpbdpath, const char *newpbdpath)
 {
+	struct mountargs *mp = NULL;
+
 	if (oldpbdpath == NULL || newpbdpath == NULL) {
 		errno = EINVAL;
 		PFSD_CLIENT_ELOG("NULL args");
@@ -470,18 +457,20 @@ pfsd_rename(const char *oldpbdpath, const char *newpbdpath)
 		return -1;
 	}
 
-	CHECK_MOUNT(newpbd);
-	CHECK_WRITABLE();
+	CHECK_MOUNT(mp, newpbd);
+	CHECK_WRITABLE(mp);
 
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	pfsd_response_t *rsp = NULL;
 	int64_t iolen = 2 * PFS_MAX_PATHLEN;
+	int const conn_id = mp->conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, iolen, (void**)&req, 0, (void**)&rsp,
+	if (pfsd_chnl_buffer_alloc(conn_id, iolen, (void**)&req, 0, (void**)&rsp,
 	    (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -492,7 +481,7 @@ retry:
 	strncpy((char*)buf, oldpath, PFS_MAX_PATHLEN);
 	strncpy((char*)buf+PFS_MAX_PATHLEN, newpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, iolen,
+	pfsd_chnl_send_recv(conn_id, req, iolen,
 	    rsp, 0, buf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -502,13 +491,15 @@ retry:
 		err = -1;
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return err;
 }
 
 int
 pfsd_open(const char *pbdpath, int flags, mode_t mode)
 {
+	struct mountargs *mp = NULL;
 	char abspath[PFS_MAX_PATHLEN];
 	pbdpath = pfsd_name_init(pbdpath, abspath, sizeof abspath);
 	if (pbdpath == NULL)
@@ -520,14 +511,16 @@ pfsd_open(const char *pbdpath, int flags, mode_t mode)
 		return -1;
 	}
 
-	CHECK_MOUNT(pbdname);
+	CHECK_MOUNT(mp, pbdname);
+	int const conn_id = mp->conn_id;
 
 	if (flags & (O_CREAT | O_TRUNC)) {
-		CHECK_WRITABLE();
+		CHECK_WRITABLE(mp);
 	}
 
 	pfsd_file_t *file = pfsd_alloc_file();
 	if (file == NULL) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -536,6 +529,7 @@ pfsd_open(const char *pbdpath, int flags, mode_t mode)
 	if (fd == -1) {
 		errno = EMFILE;
 		pfsd_free_file(file);
+		PUT_MOUNT(mp);
 		return -1;
 	}
 	file->f_flags = flags;
@@ -546,10 +540,11 @@ pfsd_open(const char *pbdpath, int flags, mode_t mode)
 	unsigned char *buf = NULL;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
 		errno = ENOMEM;
 		pfsd_close_file(file);
+		PUT_MOUNT(mp);
 		return -1;
 	}
 
@@ -560,7 +555,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN, rsp, 0, buf,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN, rsp, 0, buf,
 	    pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -575,13 +570,15 @@ retry:
 			    strerror(errno));
 	} else {
 		file->f_offset = rsp->o_rsp.o_off;
-
+		file->f_conn_id = mp->conn_id;
+		file->f_mp = mp;
 		if (flags & O_CREAT)
 			PFSD_CLIENT_LOG("open %s with inode %ld, fd %d",
 			    pbdpath, file->f_inode, fd);
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(mp->conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 
 	if (fd < 0)
 		return -1;
@@ -607,22 +604,9 @@ pfsd_creat(const char *pbdpath, mode_t mode)
 		errno = EBADF; \
 		return -1; \
 	} \
+	mp = file->f_mp; \
+	pfs_mountargs_rdlock(mp); \
 } while(0)
-
-#define PFSD_SDK_GET_FILE_WR(fd) do {\
-	if (!PFSD_FD_ISVALID(fd)) {\
-		errno = EBADF; \
-		return -1; \
-	}\
-	fd = PFSD_FD_RAW(fd); \
-	file = pfsd_get_file(fd, true); \
-	if (file == NULL) { \
-		PFSD_CLIENT_ELOG("bad fd %d", fd);\
-		errno = EBADF; \
-		return -1; \
-	} \
-} while(0)
-
 
 #define OFFSET_FILE_POS     (-1)    /* offset is current file position */
 #define OFFSET_FILE_SIZE    (-2)    /* offset is file size */
@@ -631,6 +615,7 @@ ssize_t
 pfsd_read(int fd, void *buf, size_t len)
 {
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 	char *cbuf = (char *)buf;
 	ssize_t rc = 0, total = 0, to_read = 0;
 	int err = 0;
@@ -652,7 +637,7 @@ pfsd_read(int fd, void *buf, size_t len)
 		}
 	}
 	pthread_mutex_unlock(&file->f_lseek_lock);
-	pfsd_put_file(file);
+	pfsd_put_file(file, mp);
 	return err ? err : total;
 }
 
@@ -660,6 +645,7 @@ ssize_t
 pfsd_pread(int fd, void *buf, size_t len, off_t off)
 {
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 	char *cbuf = (char *)buf;
 	ssize_t rc = 0, total = 0, to_read = 0;
 	int err = 0;
@@ -678,7 +664,7 @@ pfsd_pread(int fd, void *buf, size_t len, off_t off)
 			break;
 		}
 	}
-	pfsd_put_file(file);
+	pfsd_put_file(file, mp);
 	return err ? err : total; 
 }
 
@@ -701,6 +687,7 @@ pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len, off_t off)
 	unsigned char *rbuf = NULL;
 	ssize_t ss = -1;
 	pfsd_response_t *rsp = NULL;
+	const int conn_id = file->f_conn_id;
 
 	off_t off2 = off;
 
@@ -710,7 +697,7 @@ pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len, off_t off)
 	}
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req, len,
+	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, len,
 	    (void**)&rsp, (void**)&rbuf, (long*)(&ch)) != 0) {
 		errno = ENOMEM;
 		return -1;
@@ -723,7 +710,7 @@ retry:
 	req->r_req.r_off = off2;
 	req->common_pl_req = file->f_common_pl;
 
-	pfsd_chnl_send_recv(s_connid, req, 0, rsp, len, buf, pfsd_tolong(ch),
+	pfsd_chnl_send_recv(conn_id, req, 0, rsp, len, buf, pfsd_tolong(ch),
 	    0);
 	CHECK_STALE(rsp);
 
@@ -737,7 +724,7 @@ retry:
 		    file->f_inode, strerror(errno));
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
 	return ss;
 }
 
@@ -745,6 +732,7 @@ ssize_t
 pfsd_write(int fd, const void *buf, size_t len)
 {
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 	char *cbuf = (char *)buf;
 	ssize_t rc = 0, total = 0, to_write = 0;
 	int err = 0;
@@ -765,7 +753,7 @@ pfsd_write(int fd, const void *buf, size_t len)
 		}
 	}
 	pthread_mutex_unlock(&file->f_lseek_lock);
-	pfsd_put_file(file);
+	pfsd_put_file(file, mp);
 	return err ? err : total;
 }
 
@@ -773,6 +761,7 @@ ssize_t
 pfsd_pwrite(int fd, const void *buf, size_t len, off_t off)
 {
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 	char *cbuf = (char *)buf;
 	ssize_t rc = 0, total = 0, to_write = 0;
 	int err = 0;
@@ -801,7 +790,7 @@ pfsd_pwrite(int fd, const void *buf, size_t len, off_t off)
 	if (file->f_flags & O_APPEND) {
 		pthread_mutex_unlock(&file->f_lseek_lock);
 	}
-	pfsd_put_file(file);
+	pfsd_put_file(file, mp);
 	return err ? err : total;
 }
 
@@ -818,8 +807,12 @@ pfsd_file_pwrite(pfsd_file_t *file, const void *buf, size_t len, off_t off)
 	unsigned char *wbuf = NULL;
 	pfsd_response_t *rsp = NULL;
 	ssize_t ss = -1;
+	const int conn_id = file->f_conn_id;
 
-	CHECK_WRITABLE();
+	if (!pfsd_writable(file->f_mp->flags)) {
+		errno = EROFS;
+		return -1;
+	}
 
 	if (len == 0) {
 		return 0;
@@ -844,7 +837,7 @@ pfsd_file_pwrite(pfsd_file_t *file, const void *buf, size_t len, off_t off)
 	}
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, len, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, len, (void**)&req, 0,
 	    (void**)&rsp, (void**)&wbuf, (long*)(&ch)) != 0) {
 		errno = ENOMEM;
 		return -1;
@@ -860,7 +853,7 @@ retry:
 
 	memcpy(wbuf, buf, len);
 
-	pfsd_chnl_send_recv(s_connid, req, len, rsp, 0, wbuf, pfsd_tolong(ch),
+	pfsd_chnl_send_recv(conn_id, req, len, rsp, 0, wbuf, pfsd_tolong(ch),
 	    0);
 
 	if ((file->f_flags & O_APPEND) == 0)
@@ -879,7 +872,7 @@ retry:
 			file->f_offset = rsp->w_rsp.w_file_size;
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, wbuf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, wbuf, pfsd_tolong(ch));
 	return ss;
 }
 
@@ -899,21 +892,28 @@ pfsd_fallocate(int fd, int mode, off_t offset, off_t len)
 		return -1;
 	}
 
-	CHECK_WRITABLE();
 
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 	PFSD_SDK_GET_FILE(fd);
+
+	if (!pfsd_writable(mp->flags)) {
+		pfsd_put_file(file, mp);
+		errno = EROFS;
+		return -1;
+	}
 
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	pfsd_response_t *rsp = NULL;
+        const int conn_id = file->f_conn_id;
 	int rv = -1;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req, 0, (void**)&rsp,
+	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, 0, (void**)&rsp,
 	    NULL, (long*)(&ch)) != 0) {
 		errno = ENOMEM;
-		pfsd_put_file(file);
+		pfsd_put_file(file, mp);
 		return -1;
 	}
 
@@ -926,7 +926,7 @@ retry:
 	req->fa_req.f_mode = mode;
 	req->common_pl_req = file->f_common_pl;
 
-	pfsd_chnl_send_recv(s_connid, req, 0,
+	pfsd_chnl_send_recv(conn_id, req, 0,
 	    rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -936,14 +936,15 @@ retry:
 		PFSD_CLIENT_ELOG("fallocate ino %ld error: %s", file->f_inode, strerror(errno));
 	}
 
-	pfsd_put_file(file);
-	pfsd_chnl_buffer_free(s_connid, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_put_file(file, mp);
 	return rv;
 }
 
 int
 pfsd_truncate(const char *pbdpath, off_t len)
 {
+	struct mountargs *mp = NULL;
 	if (!pbdpath || len < 0) {
 		errno = EINVAL;
 		return -1;
@@ -960,18 +961,20 @@ pfsd_truncate(const char *pbdpath, off_t len)
 		return -1;
 	}
 
-	CHECK_MOUNT(pbdname);
-	CHECK_WRITABLE();
+	CHECK_MOUNT(mp, pbdname);
+	CHECK_WRITABLE(mp);
 
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	int rv = -1;
 	pfsd_response_t *rsp = NULL;
+	const int conn_id = mp->conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -984,7 +987,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN, rsp, 0, buf,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN, rsp, 0, buf,
 	    pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -994,7 +997,8 @@ retry:
 		PFSD_CLIENT_ELOG("truncate %s len %ld error: %s", pbdpath, len, strerror(errno));
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return rv;
 }
 
@@ -1006,20 +1010,26 @@ pfsd_ftruncate(int fd, off_t len)
 		return -1;
 	}
 
-	CHECK_WRITABLE();
 
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 	PFSD_SDK_GET_FILE(fd);
+	if (!pfsd_writable(mp->flags)) {
+		pfsd_put_file(file, mp);
+		errno = EROFS;
+		return -1;
+	}
 
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	int rv = -1;
 	pfsd_response_t *rsp = NULL;
+	const int conn_id = file->f_conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, 0,
 	    (void**)&rsp, NULL, (long*)(&ch)) != 0) {
-		pfsd_put_file(file);
+		pfsd_put_file(file, mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1032,7 +1042,7 @@ retry:
 	req->ft_req.f_len = len;
 	req->common_pl_req = file->f_common_pl;
 
-	pfsd_chnl_send_recv(s_connid, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
+	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
 	rv = rsp->ft_rsp.f_res;
@@ -1041,14 +1051,15 @@ retry:
 		PFSD_CLIENT_ELOG("ftruncate ino %ld, len %lu: %s", file->f_inode, len, strerror(errno));
 	}
 
-	pfsd_put_file(file);
-	pfsd_chnl_buffer_free(s_connid, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_put_file(file, mp);
+	pfsd_chnl_buffer_free(conn_id, req, rsp, NULL, pfsd_tolong(ch));
 	return rv;
 }
 
 int
 pfsd_unlink(const char *pbdpath)
 {
+	struct mountargs *mp = NULL;
 	char abspath[PFS_MAX_PATHLEN];
 	pbdpath = pfsd_name_init(pbdpath, abspath, sizeof abspath);
 	if (pbdpath == NULL)
@@ -1060,19 +1071,21 @@ pfsd_unlink(const char *pbdpath)
 		return -1;
 	}
 
-	CHECK_MOUNT(pbdname);
+	CHECK_MOUNT(mp, pbdname);
 	/* check writable */
-	CHECK_WRITABLE();
+	CHECK_WRITABLE(mp);
 
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	int rv = -1;
 	pfsd_response_t *rsp = NULL;
+	const int conn_id = mp->conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1083,7 +1096,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN,
 	    rsp, 0, buf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1094,13 +1107,15 @@ retry:
 			PFSD_CLIENT_ELOG("unlink %s: %s", pbdpath, strerror(errno));
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return rv;
 }
 
 int
 pfsd_stat(const char *pbdpath, struct stat *st)
 {
+	struct mountargs *mp = NULL;
 	if (!pbdpath || !st) {
 		errno = EINVAL;
 		return -1;
@@ -1111,15 +1126,24 @@ pfsd_stat(const char *pbdpath, struct stat *st)
 	if (pbdpath == NULL)
 		return -1;
 
+	char pbdname[PFS_MAX_NAMELEN];
+	if (pfsd_sdk_pbdname(pbdpath, pbdname) != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	CHECK_MOUNT(mp, pbdname);
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	int rv = -1;
 	pfsd_response_t *rsp = NULL;
+	int const conn_id = mp->conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1129,7 +1153,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN,
 	    rsp, 0, buf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1142,7 +1166,8 @@ retry:
 		memcpy(st, &rsp->s_rsp.s_st, sizeof(*st));
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return rv;
 }
 
@@ -1155,17 +1180,19 @@ pfsd_fstat(int fd, struct stat *st)
 	}
 
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 	PFSD_SDK_GET_FILE(fd);
 
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	int rv = -1;
 	pfsd_response_t *rsp = NULL;
+	int const conn_id = file->f_conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, 0,
 	    (void**)&rsp, NULL, (long*)(&ch)) != 0) {
-		pfsd_put_file(file);
+		pfsd_put_file(file, mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1175,7 +1202,7 @@ retry:
 	req->f_req.f_ino = file->f_inode;
 	req->common_pl_req = file->f_common_pl;
 
-	pfsd_chnl_send_recv(s_connid, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
+	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
 	rv = rsp->f_rsp.f_res;
@@ -1186,8 +1213,8 @@ retry:
 		memcpy(st, &rsp->f_rsp.f_st, sizeof(*st));
 	}
 
-	pfsd_put_file(file);
-	pfsd_chnl_buffer_free(s_connid, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_put_file(file, mp);
 	return rv;
 }
 
@@ -1246,12 +1273,13 @@ pfsd_lseek(int fd, off_t offset, int whence)
 {
 	off_t rc = -1;
 	pfsd_file_t *file = NULL;
+	mountargs_t *mp = NULL;
 
 	PFSD_SDK_GET_FILE(fd);
 	pthread_mutex_lock(&file->f_lseek_lock);
 	rc = pfsd_file_lseek(file, offset, whence);
 	pthread_mutex_unlock(&file->f_lseek_lock);
-	pfsd_put_file(file);
+	pfsd_put_file(file, mp);
 	return rc;
 }
 
@@ -1262,6 +1290,7 @@ pfsd_file_lseek(pfsd_file_t *file, off_t offset, int whence)
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	pfsd_response_t *rsp = NULL;
+	int const conn_id = file->f_conn_id;
 
 	off_t rv = -1;
 	rv = local_file_lseek(file, offset, whence);
@@ -1272,7 +1301,7 @@ pfsd_file_lseek(pfsd_file_t *file, off_t offset, int whence)
 
 retry:
 	/* ask pfsd to seek end */
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, 0,
 	    (void**)&rsp, NULL, (long*)(&ch)) != 0) {
 		errno = ENOMEM;
 		return -1;
@@ -1286,7 +1315,7 @@ retry:
 	req->common_pl_req = file->f_common_pl;
 	assert (whence == SEEK_END); /* must be SEED_END */
 
-	pfsd_chnl_send_recv(s_connid, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
+	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
 	if (rsp->l_rsp.l_offset < 0) {
@@ -1299,7 +1328,7 @@ retry:
 		rv = rsp->l_rsp.l_offset;
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, NULL, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, NULL, pfsd_tolong(ch));
 
 finish:
 	return rv;
@@ -1326,7 +1355,7 @@ pfsd_close(int fd)
 		err = pfsd_close_file(file);
 		if (err != 0) {
 			PFSD_CLIENT_ELOG("close fd %d failed, err:%d", fd, err);
-			pfsd_put_file(file);
+			pfsd_put_file(file, NULL);
 		}
 	}
 	if (err < 0) {
@@ -1339,6 +1368,7 @@ pfsd_close(int fd)
 int
 pfsd_chdir(const char *pbdpath)
 {
+	struct mountargs *mp = NULL;
 	char abspath[PFS_MAX_PATHLEN];
 	pbdpath = pfsd_name_init(pbdpath, abspath, sizeof abspath);
 	if (pbdpath == NULL)
@@ -1346,19 +1376,30 @@ pfsd_chdir(const char *pbdpath)
 
 	assert (pbdpath == abspath);
 
-	if (!pfsd_chdir_begin())
+	char pbdname[PFS_MAX_NAMELEN];
+	if (pfsd_sdk_pbdname(pbdpath, pbdname) != 0) {
+		errno = EINVAL;
 		return -1;
+	}
+
+	CHECK_MOUNT(mp, pbdname);
+	if (!pfsd_chdir_begin()) {
+		PUT_MOUNT(mp);
+		return -1;
+	}
 
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	int rv = -1;
 	pfsd_response_t *rsp = NULL;
+	int const conn_id = mp->conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
 		pfsd_chdir_end();
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1368,7 +1409,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN,
 	    rsp, 0, buf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1388,7 +1429,8 @@ retry:
 	}
 
 	pfsd_chdir_end();
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return rv;
 }
 
@@ -1422,6 +1464,7 @@ pfsd_getcwd(char *buf, size_t size)
 int
 pfsd_mkdir(const char *pbdpath, mode_t mode)
 {
+	struct mountargs *mp = NULL;
 	char abspath[PFS_MAX_PATHLEN];
 	pbdpath = pfsd_name_init(pbdpath, abspath, sizeof abspath);
 	if (pbdpath == NULL)
@@ -1433,18 +1476,20 @@ pfsd_mkdir(const char *pbdpath, mode_t mode)
 		return -1;
 	}
 
-	CHECK_MOUNT(pbdname);
-	CHECK_WRITABLE();
+	CHECK_MOUNT(mp, pbdname);
+	CHECK_WRITABLE(mp);
 
 	int err = 0;
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	pfsd_response_t *rsp = NULL;
+	int const conn_id = mp->conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1455,7 +1500,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN,
 	    rsp, 0, buf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1465,13 +1510,15 @@ retry:
 		PFSD_CLIENT_ELOG("mkdir %s error: %s", pbdpath, strerror(errno));
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return err;
 }
 
 int
 pfsd_rmdir(const char *pbdpath)
 {
+	struct mountargs *mp = NULL;
 	char abspath[PFS_MAX_PATHLEN];
 	pbdpath = pfsd_name_init(pbdpath, abspath, sizeof abspath);
 	if (pbdpath == NULL)
@@ -1483,18 +1530,20 @@ pfsd_rmdir(const char *pbdpath)
 		return -1;
 	}
 
-	CHECK_MOUNT(pbdname);
-	CHECK_WRITABLE();
+	CHECK_MOUNT(mp, pbdname);
+	CHECK_WRITABLE(mp);
 
 	int err = 0;
 	pfsd_iochannel_t *ch = NULL;
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	pfsd_response_t *rsp = NULL;
+	int const conn_id = mp->conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1505,7 +1554,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN,
 	    rsp, 0, buf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1515,13 +1564,15 @@ retry:
 		PFSD_CLIENT_ELOG("rmdir %s error: %s", pbdpath, strerror(errno));
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 	return err;
 }
 
 DIR *
 pfsd_opendir(const char *pbdpath)
 {
+	struct mountargs *mp = NULL;
 	char abspath[PFS_MAX_PATHLEN];
 	pbdpath = pfsd_name_init(pbdpath, abspath, sizeof abspath);
 	if (pbdpath == NULL)
@@ -1533,12 +1584,7 @@ pfsd_opendir(const char *pbdpath)
 		return NULL;
 	}
 
-	if (strncmp(s_pbdname, pbdname, sizeof(s_pbdname)) != 0) {
-		PFSD_CLIENT_ELOG("No such device %s, exists %s", pbdname,
-		    s_pbdname);
-		errno = ENODEV;
-		return NULL;
-	}
+	CHECK_MOUNT_RETVAL(mp, pbdname, NULL);
 
 	DIR *dir = NULL;
 
@@ -1546,10 +1592,11 @@ pfsd_opendir(const char *pbdpath)
 	pfsd_request_t *req = NULL;
 	unsigned char *buf = NULL;
 	pfsd_response_t *rsp = NULL;
-
+	int const conn_id = mp->conn_id;
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return NULL;
 	}
@@ -1559,7 +1606,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN,
 	    rsp, 0, buf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1575,10 +1622,12 @@ retry:
 			memset(dir, 0, sizeof(*dir));
 			dir->d_ino = rsp->od_rsp.o_dino;
 			dir->d_next_ino = rsp->od_rsp.o_first_ino;
+			dir->d_conn_id = conn_id;
 		}
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 
 	if (dir == NULL)
 		return NULL;
@@ -1649,9 +1698,10 @@ pfsd_readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
 	pfsd_request_t *req = NULL;
 	pfsd_response_t *rsp = NULL;
 	unsigned char *dbuf = NULL;
+	int const conn_id = dir->d_conn_id;
 
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, 0, (void**)&req,
+	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req,
 	    PFSD_DIRENT_BUFFER_SIZE, (void**)&rsp, (void**)&dbuf, (long*)(&ch))
 	    != 0) {
 		errno = ENOMEM;
@@ -1663,7 +1713,7 @@ retry:
 	req->rd_req.r_ino = dir->d_next_ino;
 	req->rd_req.r_offset = dir->d_next_offset;
 
-	pfsd_chnl_send_recv(s_connid, req, 0,
+	pfsd_chnl_send_recv(conn_id, req, 0,
 	    rsp, PFSD_DIRENT_BUFFER_SIZE, dbuf, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1687,7 +1737,7 @@ retry:
 		dir->d_next_offset = rsp->rd_rsp.r_offset;
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, dbuf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, dbuf, pfsd_tolong(ch));
 	return err;
 }
 
@@ -1712,6 +1762,7 @@ pfsd_closedir(DIR *dir)
 int
 pfsd_access(const char *pbdpath, int amode)
 {
+	struct mountargs *mp = NULL;
 	if (amode != F_OK &&
 		(amode & (R_OK | W_OK | X_OK)) == 0) {
 		errno = EINVAL;
@@ -1731,10 +1782,10 @@ pfsd_access(const char *pbdpath, int amode)
 		return -1;
 	}
 
-	CHECK_MOUNT(pbdname);
+	CHECK_MOUNT(mp, pbdname);
 
 	if (amode & W_OK) {
-		CHECK_WRITABLE();
+		CHECK_WRITABLE(mp);
 	}
 
 	int err = 0;
@@ -1742,10 +1793,11 @@ pfsd_access(const char *pbdpath, int amode)
 	pfsd_request_t *req = NULL;
 	pfsd_response_t *rsp = NULL;
 	unsigned char *buf = NULL;
-
+	int const conn_id = mp->conn_id;
 retry:
-	if (pfsd_chnl_buffer_alloc(s_connid, PFS_MAX_PATHLEN, (void**)&req, 0,
+	if (pfsd_chnl_buffer_alloc(conn_id, PFS_MAX_PATHLEN, (void**)&req, 0,
 	    (void**)&rsp, (void**)&buf, (long*)(&ch)) != 0) {
+		PUT_MOUNT(mp);
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1756,7 +1808,7 @@ retry:
 	/* copy pbdpath to iobuf */
 	strncpy((char*)buf, pbdpath, PFS_MAX_PATHLEN);
 
-	pfsd_chnl_send_recv(s_connid, req, PFS_MAX_PATHLEN, rsp, 0, buf,
+	pfsd_chnl_send_recv(conn_id, req, PFS_MAX_PATHLEN, rsp, 0, buf,
 	    pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
@@ -1768,7 +1820,8 @@ retry:
 			    strerror(errno));
 	}
 
-	pfsd_chnl_buffer_free(s_connid, req, rsp, buf, pfsd_tolong(ch));
+	pfsd_chnl_buffer_free(conn_id, req, rsp, buf, pfsd_tolong(ch));
+	PUT_MOUNT(mp);
 
 	return err;
 }

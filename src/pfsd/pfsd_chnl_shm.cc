@@ -186,10 +186,11 @@ chnl_accept_shm_sync(chnl_ctx_shm_t *ctx, pfsd_chnl_op_t *op,
 		goto out;
 	}
 
-    if (g_option.o_auto_increase_epoch == 1) {
-        file_data.sync_data.flags |= MNTFLG_AUTO_INCREASE_EPOCH;
-    }
-
+#ifdef PFSD_SERVER
+	if (g_option.o_auto_increase_epoch == 1) {
+		file_data.sync_data.flags |= MNTFLG_AUTO_INCREASE_EPOCH;
+	}
+#endif
 	if (!pfsd_is_valid_connid(connect_id)) {
 		/* first mount */
 		// 2 is special for thread mode mount to avoid alive check
@@ -1110,7 +1111,8 @@ chnl_connection_open_shm(chnl_ctx_shm_t *ctx)
 }
 
 #ifdef PFSD_CLIENT
-extern int s_mount_epoch;
+extern int pfs_mount_epoch;
+extern pthread_mutex_t pfs_mount_epoch_mtx;
 #endif
 
 /* client side */
@@ -1146,12 +1148,13 @@ chnl_connection_sync_shm(chnl_ctx_shm_t *ctx, const char *cluster,
 	    sizeof(file_data->ack_data),
 	    offsetof(pidfile_data_t, ack_data)));
 	if (result == sizeof(file_data->ack_data)) {
-		s_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
+		if (file_data->ack_data.v1.shm_mnt_epoch > pfs_mount_epoch)
+			pfs_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
 		memset(&file_data->ack_data, 0, sizeof(file_data->ack_data));
 	}
-	file_data->sync_data.shm_mnt_epoch = s_mount_epoch + 1;
+	file_data->sync_data.shm_mnt_epoch = pfs_mount_epoch + 1;
 	if (result == sizeof(file_data->ack_data))
-		++s_mount_epoch;
+		++pfs_mount_epoch;
 	result = TEMP_FAILURE_RETRY(pwrite(ctx->ctx_pidfile_fd,
 	    &file_data->sync_data,
 	    sizeof(file_data->sync_data),
@@ -1361,18 +1364,18 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, int timeout_us, bool reconn)
 				wait = false;
 			} else {
 				if (file_data->ack_data.v1.shm_mnt_epoch >=
-				    s_mount_epoch) {
-					s_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
+				    pfs_mount_epoch) {
+					pfs_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
 					PFSD_CLIENT_LOG(
 					    "ack data update s_mount_epoch %d",
-					    s_mount_epoch);
+					    pfs_mount_epoch);
 					wait = false;
 				} else {
 					if (i++ % 10000 == 0) {
 						PFSD_CLIENT_LOG(
 						    "waiting... file.epoch %d, s_mount_epoch %d",
 						    file_data->ack_data.v1.shm_mnt_epoch,
-						    s_mount_epoch);
+						    pfs_mount_epoch);
 					}
 				}
 			}
@@ -1460,13 +1463,16 @@ chnl_connect_shm(void *chnl_ctx, const char *cluster, const char *pbdname,
 		}
 	}
 
+	pthread_mutex_lock(&pfs_mount_epoch_mtx);
 	result = chnl_connection_sync_shm(ctx, cluster, pbdname, host_id, flags);
 	if (result < 0) {
+		pthread_mutex_unlock(&pfs_mount_epoch_mtx);
 		PFSD_CLIENT_ELOG("Failed sync shm: %s", strerror(errno));
 		goto fini;
 	}
 
 	result = chnl_connection_poll_shm(ctx, timeout_us, reconn);
+	pthread_mutex_unlock(&pfs_mount_epoch_mtx);
 	conn_id = result;
 
 	if (conn_id != -1) {

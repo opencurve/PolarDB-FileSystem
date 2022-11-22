@@ -37,12 +37,15 @@ typedef struct pfsd_file {
     int     f_flags;
     off_t   f_offset;
 
+    int     f_conn_id;
+    struct mountargs *f_mp;
     int64_t f_inode;
     int32_t f_refcnt; /* incr when be reading/writing */
     pfsd_chnl_payload_common_t f_common_pl;
 } pfsd_file_t;
 
 void pfsd_sdk_file_init();
+void pfsd_sdk_file_reinit();
 
 /* for sdk internal */
 pfsd_file_t *
@@ -51,9 +54,9 @@ void	pfsd_free_file(pfsd_file_t*);
 int	pfsd_alloc_fd(pfsd_file_t*);
 pfsd_file_t *
 	pfsd_get_file(int fd, bool writelock);
-void	pfsd_put_file(pfsd_file_t *file);
+void	pfsd_put_file(pfsd_file_t *file, struct mountargs *mp);
 int	pfsd_close_file(pfsd_file_t *file);
-void	pfsd_file_cleanup();
+void	pfsd_file_cleanup(int conn_id);
 
 /* dir */
 bool	pfsd_chdir_begin();
