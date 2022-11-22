@@ -57,15 +57,17 @@ pfs_mountargs_free(struct mountargs *mp)
 }
 
 static void
-pfs_mountargs_register(struct mountargs *mp)
+pfs_mountargs_register(struct mountargs *mp, int locked)
 {
-	pthread_mutex_lock(&pfs_init_mtx);
+	if (!locked)
+		pthread_mutex_lock(&pfs_init_mtx);
 	if (!mp->on_list) {
 		TAILQ_INSERT_HEAD(&mount_list, mp, link);
 		mp->on_list = 1;
 		mp->ref_count++;
 	}
-	pthread_mutex_unlock(&pfs_init_mtx);
+	if (!locked)
+		pthread_mutex_unlock(&pfs_init_mtx);
 }
 
 static void
@@ -346,7 +348,7 @@ pfs_mount_post(void *handle, int err)
 		pfsd_paxos_hostid_local_unlock(result->hostid_lock_fd);
 		pfs_mountargs_free(result);
 	} else {
-		pfs_mountargs_register(result);
+		pfs_mountargs_register(result, true);
 	}
 	PFSD_CLIENT_LOG("pfs_mount_post err : %d", err);
 }
