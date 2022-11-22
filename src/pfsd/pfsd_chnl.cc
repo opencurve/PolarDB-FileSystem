@@ -30,28 +30,37 @@ static pthread_mutex_t pfsd_connect_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static pfsd_connect_entry_t pfsd_connect_data[CHNL_MAX_CONN];
 
-static pfsd_connect_entry_t *
+#ifndef PFSD_SERVER
+static int
 pfsd_connect_add_data(int32_t connect_id, void *data, pfsd_chnl_op *op)
 {
+	int i;
 	pfsd_connect_entry_t *result = NULL;
 	if (!pfsd_is_valid_connid(connect_id)) {
 		errno = EINVAL;
-		return result;
+		return -1;
 	}
 	pthread_mutex_lock(&pfsd_connect_mutex);
-
-	if (pfsd_connect_data[connect_id].connect_id == 0) {
-		result = &pfsd_connect_data[connect_id];
-		result->connect_id = connect_id;
-		result->connect_data = data; /* type chnl_ctx_shm_t for SHM */
-		result->connect_op = op;
-	} else {
-		errno = EINVAL;
+	// skip id 0
+	for (i = 1; i < CHNL_MAX_CONN; ++i) {
+		if (pfsd_connect_data[i].connect_id == 0) {
+			result = &pfsd_connect_data[i];
+			result->connect_id = connect_id;
+			result->connect_data = data; /* type chnl_ctx_shm_t for SHM */
+			result->connect_op = op;
+			break;
+		}
 	}
-
 	pthread_mutex_unlock(&pfsd_connect_mutex);
-	return  result;
+
+	if (result == NULL) {
+               PFSD_CLIENT_ELOG(
+                   "can not add connection id : %d, table full", connect_id);
+        }
+
+	return result ? (result - pfsd_connect_data) : -1;
 }
+#endif
 
 static pfsd_connect_entry_t *
 pfsd_connect_get_entry(int32_t connect_id)
@@ -63,7 +72,7 @@ pfsd_connect_get_entry(int32_t connect_id)
 	}
 	pthread_mutex_lock(&pfsd_connect_mutex);
 
-	if(pfsd_connect_data[connect_id].connect_id == connect_id) {
+	if (pfsd_connect_data[connect_id].connect_id) {
 		result = &pfsd_connect_data[connect_id];
 		++result->connect_refcnt;
 	}
@@ -81,7 +90,7 @@ pfsd_connect_put_entry(int32_t connect_id)
 		return result;
 	}
 	pthread_mutex_lock(&pfsd_connect_mutex);
-	if(pfsd_connect_data[connect_id].connect_id == connect_id) {
+	if (pfsd_connect_data[connect_id].connect_id) {
 		result = &pfsd_connect_data[connect_id];
 		--result->connect_refcnt;
 	}
@@ -112,6 +121,7 @@ pfsd_chnl_ctx_create(const char *name, void **ctx, pfsd_chnl_op_t **op, bool is_
 	return;
 }
 
+#ifndef PFSD_SERVER
 /* client side */
 int32_t
 pfsd_chnl_connect(const char *svr_addr, const char *cluster, int timeout_ms,
@@ -153,11 +163,14 @@ pfsd_chnl_connect(const char *svr_addr, const char *cluster, int timeout_ms,
 		return -1;
 	}
 
-	if (!pfsd_connect_add_data(conn_id, ctx, op)) {
+	int saved_id = conn_id;
+	conn_id = pfsd_connect_add_data(conn_id, ctx, op);
+	if (conn_id == -1) {
 		op->chnl_close(ctx, true);
 		op->chnl_ctx_destroy(ctx);
 		return -1;
 	}
+	PFSD_CLIENT_ELOG("server conn id: %d, mapped to %d", saved_id, conn_id);
 
 	return conn_id;
 }
@@ -271,6 +284,7 @@ pfsd_chnl_send_recv(int32_t connect_id, void *req_buffer, int64_t req_len,
 	pfsd_connect_put_entry(connect_id);
 	return iresult;
 }
+#endif
 
 /* server side */
 int
