@@ -120,7 +120,9 @@ pfsd_atfork_child_post()
 	gettimeofday(&now, NULL);
 	srand((unsigned)((now.tv_sec + now.tv_usec) ^ getpid()));
 
+	pthread_mutex_init(&pfs_init_mtx, NULL);
 	pfsd_sdk_file_reinit();
+	pfsd_connect_child_post();  
 	pfs_mount_atfork_child();
 }
 

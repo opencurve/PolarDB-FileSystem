@@ -73,6 +73,8 @@ int pfsd_chnl_close(int32_t connect_id, bool force);
 int pfsd_chnl_listen(const char *svr_addr, const char *pbdname, int nworkers,
     void *arg1, void *arg2);
 
+void pfsd_connect_child_post(void);
+
 /* server side */
 int32_t pfsd_chnl_accept_begin(void *ctx, void *op, int32_t conn_id_hint);
 

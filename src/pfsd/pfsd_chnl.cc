@@ -69,6 +69,13 @@ pfsd_connect_add_data(int32_t connect_id, void *data, pfsd_chnl_op *op)
 
 	return result ? (result - pfsd_connect_data) : -1;
 }
+
+void pfsd_connect_child_post(void)
+{
+	pthread_rwlock_init(&pfsd_connect_lock, NULL);
+	memset(pfsd_connect_data, 0, sizeof(pfsd_connect_data));
+}
+
 #endif
 
 static pfsd_connect_entry_t *
