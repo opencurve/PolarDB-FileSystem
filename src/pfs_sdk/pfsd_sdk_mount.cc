@@ -356,6 +356,7 @@ void
 pfs_mount_atfork_child()
 {
 	TAILQ_INIT(&mount_list);
+	TAILQ_INIT(&mount_inprogress_list);
 	pthread_mutex_init(&pfs_init_mtx, NULL);
 	pthread_mutex_init(&pfs_mount_epoch_mtx, NULL);
 }
