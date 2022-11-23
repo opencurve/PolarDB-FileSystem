@@ -214,28 +214,6 @@ pfsd_close_file(pfsd_file_t *f)
 	return err;
 }
 
-int
-pfsd_close_file_locked(pfsd_file_t *f)
-{
-	if (!f)
-		return -EINVAL;
-
-	if (f->f_fd < 0 || f->f_fd >= PFSD_MAX_NFD)
-		return -EBADF;
-
-	int err = -EAGAIN;
-
-	if (f->f_refcnt <= 1) {
-		err = 0;
-		fd_put_free(f->f_fd);
-	}
-	if (err == 0)
-		pfsd_free_file(f);
-
-	return err;
-}
-
-
 static pthread_mutex_t pfsd_chdir_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 bool
