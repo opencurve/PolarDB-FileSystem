@@ -182,7 +182,7 @@ pfsd_sdk_init(int mode, const char *svraddr, int timeout_ms,
 
 mount_vol:
 	if (pfs_mountargs_exists(pbdname) ||
-            pfs_mountargs_inprogress(pbdname)) {
+	    pfs_mountargs_inprogress(pbdname)) {
 		PFSD_CLIENT_ELOG("pbd %s is already mounted", pbdname);
 		pthread_mutex_unlock(&pfs_init_mtx);
 		return -1;

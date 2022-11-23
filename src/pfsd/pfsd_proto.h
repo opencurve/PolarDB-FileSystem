@@ -445,7 +445,7 @@ typedef struct __dirstream {
 
 	uint64_t d_next_offset;
 	int64_t d_next_ino;
-        int d_conn_id;
+	int d_conn_id;
 
 	/* For dirent buffer */
 	uint64_t d_data_offset;

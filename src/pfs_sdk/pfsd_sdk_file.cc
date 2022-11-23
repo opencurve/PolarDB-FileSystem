@@ -83,7 +83,7 @@ pfsd_alloc_file()
 	pthread_mutex_init(&f->f_lseek_lock, NULL);
 	f->f_fd = -1;
 	f->f_inode = -1;
-        f->f_conn_id = -1;
+	f->f_conn_id = -1;
 	return f;
 }
 
