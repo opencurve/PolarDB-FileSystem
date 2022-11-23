@@ -26,6 +26,7 @@
 #include <sys/inotify.h>
 #include <stddef.h>
 #include <sys/types.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -1111,8 +1112,67 @@ chnl_connection_open_shm(chnl_ctx_shm_t *ctx)
 }
 
 #ifdef PFSD_CLIENT
-extern int pfs_mount_epoch;
-extern pthread_mutex_t pfs_mount_epoch_mtx;
+/* mount epoch is persistent data, it is never removed */
+static pthread_mutex_t mount_epoch_mtx = PTHREAD_MUTEX_INITIALIZER;
+struct mount_epoch_entry {
+	TAILQ_ENTRY(mount_epoch_entry) link;
+	int epoch;
+	char pbdname[PBD_MAX_NAME_LEN+1];
+};
+static TAILQ_HEAD(mount_epoch_list, mount_epoch_entry) mount_epoch_list = 
+	TAILQ_HEAD_INITIALIZER(mount_epoch_list);
+
+static struct mount_epoch_entry *
+mount_epoch_entry_get(const char *pbdname)
+{
+	struct mount_epoch_entry *e;
+
+	TAILQ_FOREACH(e, &mount_epoch_list, link) {
+		if (!strcmp(e->pbdname, pbdname)) {
+			break;
+		}
+	}
+
+	if (e == NULL) {
+		e = (struct mount_epoch_entry *)malloc(sizeof(*e));
+		e->epoch = 0;
+		strncpy(e->pbdname, pbdname, PBD_MAX_NAME_LEN);
+		e->pbdname[PBD_MAX_NAME_LEN] = 0;
+		TAILQ_INSERT_HEAD(&mount_epoch_list, e, link);
+	}
+	return e;
+}
+
+static int
+mount_epoch_get(const char *pbdname)
+{
+	int epoch = 0;
+
+	pthread_mutex_lock(&mount_epoch_mtx);
+	epoch = mount_epoch_entry_get(pbdname)->epoch;
+	pthread_mutex_unlock(&mount_epoch_mtx);
+	return epoch;
+}
+
+static int
+mount_epoch_set(const char *pbdname, int epoch)
+{
+	struct mount_epoch_entry *e = NULL;
+
+	pthread_mutex_lock(&mount_epoch_mtx);
+	e = mount_epoch_entry_get(pbdname);
+	e->epoch = epoch;
+	pthread_mutex_unlock(&mount_epoch_mtx);
+	return epoch;
+}
+
+static void
+mount_epoch_child_post(void)
+{
+	pthread_mutex_init(&mount_epoch_mtx, NULL);
+	TAILQ_INIT(&mount_epoch_list);
+}
+
 #endif
 
 /* client side */
@@ -1147,14 +1207,17 @@ chnl_connection_sync_shm(chnl_ctx_shm_t *ctx, const char *cluster,
 	    &file_data->ack_data,
 	    sizeof(file_data->ack_data),
 	    offsetof(pidfile_data_t, ack_data)));
+	int pfs_mount_epoch = mount_epoch_get(pbdname);
 	if (result == sizeof(file_data->ack_data)) {
 		if (file_data->ack_data.v1.shm_mnt_epoch > pfs_mount_epoch)
-			pfs_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
+			pfs_mount_epoch = mount_epoch_set(pbdname, file_data->ack_data.v1.shm_mnt_epoch);
 		memset(&file_data->ack_data, 0, sizeof(file_data->ack_data));
 	}
 	file_data->sync_data.shm_mnt_epoch = pfs_mount_epoch + 1;
-	if (result == sizeof(file_data->ack_data))
+	if (result == sizeof(file_data->ack_data)) {
 		++pfs_mount_epoch;
+		mount_epoch_set(pbdname, pfs_mount_epoch);
+	}
 	result = TEMP_FAILURE_RETRY(pwrite(ctx->ctx_pidfile_fd,
 	    &file_data->sync_data,
 	    sizeof(file_data->sync_data),
@@ -1327,7 +1390,7 @@ chnl_ctx_destroy_shm(void *chnl_ctx)
 
 /* client side */
 int32_t
-chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, int timeout_us, bool reconn)
+chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_us, bool reconn)
 {
 #ifdef PFSD_CLIENT
 	int32_t conn_id = -1;
@@ -1363,9 +1426,11 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, int timeout_us, bool reconn)
 				result = -1;
 				wait = false;
 			} else {
+				int pfs_mount_epoch = mount_epoch_get(pbdname);
 				if (file_data->ack_data.v1.shm_mnt_epoch >=
 				    pfs_mount_epoch) {
 					pfs_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
+					mount_epoch_set(pbdname, pfs_mount_epoch);
 					PFSD_CLIENT_LOG(
 					    "ack data update s_mount_epoch %d",
 					    pfs_mount_epoch);
@@ -1463,16 +1528,13 @@ chnl_connect_shm(void *chnl_ctx, const char *cluster, const char *pbdname,
 		}
 	}
 
-	pthread_mutex_lock(&pfs_mount_epoch_mtx);
 	result = chnl_connection_sync_shm(ctx, cluster, pbdname, host_id, flags);
 	if (result < 0) {
-		pthread_mutex_unlock(&pfs_mount_epoch_mtx);
 		PFSD_CLIENT_ELOG("Failed sync shm: %s", strerror(errno));
 		goto fini;
 	}
 
-	result = chnl_connection_poll_shm(ctx, timeout_us, reconn);
-	pthread_mutex_unlock(&pfs_mount_epoch_mtx);
+	result = chnl_connection_poll_shm(ctx, pbdname, timeout_us, reconn);
 	conn_id = result;
 
 	if (conn_id != -1) {
@@ -1671,8 +1733,10 @@ chnl_update_meta_shm(void *chnl_ctx, long meta)
 #endif
 }
 
-
 void pfsd_chnl_shm_client_init() {
+#ifdef PFSD_CLIENT
+	pthread_atfork(NULL, NULL, mount_epoch_child_post);
+#endif
 }
 
 PFSD_CHNL_REGISTER(_shm, shared_memory);

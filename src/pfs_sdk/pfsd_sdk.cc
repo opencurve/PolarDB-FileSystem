@@ -134,13 +134,13 @@ pfsd_sdk_init(int mode, const char *svraddr, int timeout_ms,
 	if (cluster == NULL)
 		cluster = "polarstore";
 
-	pfsd_chnl_shm_client_init(); /* ! forced link pfsd_chnl_shm.o in libpfsd.a */
-
 	pthread_mutex_lock(&pfs_init_mtx);
 	if (s_inited == 1) {
 		PFSD_CLIENT_LOG("sdk has already been initialized by other threads");
 		goto mount_vol;
 	}
+
+	pfsd_chnl_shm_client_init(); /* ! forced link pfsd_chnl_shm.o in libpfsd.a */
 
 	if (flags & MNTFLG_TOOL) {
 		char logfile[1024] = "";
