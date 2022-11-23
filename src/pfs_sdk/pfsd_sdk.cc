@@ -179,7 +179,8 @@ pfsd_sdk_init(int mode, const char *svraddr, int timeout_ms,
 	s_inited = 1;
 
 mount_vol:
-	if (pfs_mountargs_exists(pbdname)) {
+	if (pfs_mountargs_exists(pbdname) ||
+            pfs_mountargs_inprogress(pbdname)) {
 		PFSD_CLIENT_ELOG("pbd %s is already mounted", pbdname);
 		pthread_mutex_unlock(&pfs_init_mtx);
 		return -1;
@@ -192,20 +193,27 @@ mount_vol:
 		PFSD_CLIENT_ELOG("pfs_mount_prepare failed, maybe hostid %d used, err %s", host_id, strerror(errno));
 		goto failed;
 	}
+	pfs_mountargs_add_inprogress(mp);	
 
+	pthread_mutex_unlock(&pfs_init_mtx);
 	conn_id = pfsd_chnl_connect(s_svraddr, cluster, timeout_ms, pbdname, host_id, flags);
+	pthread_mutex_lock(&pfs_init_mtx);
+
 	PFSD_CLIENT_LOG("pfsd_chnl_connect %s", conn_id > 0 ? "success" : "failed");
 	if (conn_id <= 0)
 		goto failed;
 
+	pfs_mountargs_remove_inprogress(mp);
 	mp->conn_id = conn_id;
 	pfs_mount_post(mp, 0);
 	pthread_mutex_unlock(&pfs_init_mtx);
 	return 0;
 
 failed:
-	if (mp)
+	if (mp) {
+		pfs_mountargs_remove_inprogress(mp);	
 		pfs_mount_post(mp, -1);
+	}
 	pthread_mutex_unlock(&pfs_init_mtx);
 	return -1;
 }
