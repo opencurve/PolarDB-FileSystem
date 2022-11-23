@@ -26,7 +26,7 @@
 #include "pfsd_chnl.h"
 #include "pfsd_chnl_impl.h"
 
-static pthread_mutex_t pfsd_connect_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_rwlock_t pfsd_connect_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 static pfsd_connect_entry_t pfsd_connect_data[CHNL_MAX_CONN];
 
@@ -42,7 +42,7 @@ pfsd_connect_add_data(int32_t connect_id, void *data, pfsd_chnl_op *op)
 		errno = EINVAL;
 		return -1;
 	}
-	pthread_mutex_lock(&pfsd_connect_mutex);
+	pthread_rwlock_wrlock(&pfsd_connect_lock);
 	i = hint;
 	while (count) {
 		if (i != 0 && pfsd_connect_data[i].connect_id == 0) {
@@ -60,7 +60,7 @@ pfsd_connect_add_data(int32_t connect_id, void *data, pfsd_chnl_op *op)
 			i = 1; // skip id 0
 		count--;
 	}
-	pthread_mutex_unlock(&pfsd_connect_mutex);
+	pthread_rwlock_unlock(&pfsd_connect_lock);
 
 	if (result == NULL) {
                PFSD_CLIENT_ELOG(
@@ -79,32 +79,33 @@ pfsd_connect_get_entry(int32_t connect_id)
 		errno = EINVAL;
 		return result;
 	}
-	pthread_mutex_lock(&pfsd_connect_mutex);
+	pthread_rwlock_rdlock(&pfsd_connect_lock);
 
 	if (pfsd_connect_data[connect_id].connect_id) {
 		result = &pfsd_connect_data[connect_id];
-		++result->connect_refcnt;
+		__atomic_add_fetch(&result->connect_refcnt, 1, __ATOMIC_RELAXED);
 	}
 
-	pthread_mutex_unlock(&pfsd_connect_mutex);
+	pthread_rwlock_unlock(&pfsd_connect_lock);
 	return  result;
 }
 
-static pfsd_connect_entry_t *
+static int
 pfsd_connect_put_entry(int32_t connect_id)
 {
-	pfsd_connect_entry_t *result = NULL;
+	int ret = -1;
 	if (!pfsd_is_valid_connid(connect_id)) {
 		errno = EINVAL;
-		return result;
+		return -1;
 	}
-	pthread_mutex_lock(&pfsd_connect_mutex);
+	pthread_rwlock_rdlock(&pfsd_connect_lock);
 	if (pfsd_connect_data[connect_id].connect_id) {
-		result = &pfsd_connect_data[connect_id];
-		--result->connect_refcnt;
+		ret = 0;
+		pfsd_connect_entry_t *e = &pfsd_connect_data[connect_id];
+		__atomic_sub_fetch(&e->connect_refcnt, 1, __ATOMIC_RELAXED);
 	}
-	pthread_mutex_unlock(&pfsd_connect_mutex);
-	return  result;
+	pthread_rwlock_unlock(&pfsd_connect_lock);
+	return ret;
 }
 
 /* Both sides */
@@ -407,7 +408,7 @@ pfsd_chnl_accept_begin(void *ctx, void *op, int32_t conn_id_hint)
 	pfsd_connect_entry_t *ptr = NULL;
 	int32_t conn_id = -1;
 	assert(pfsd_is_valid_connid(conn_id_hint));
-	pthread_mutex_lock(&pfsd_connect_mutex);
+	pthread_rwlock_wrlock(&pfsd_connect_lock);
 	while (true) {
 		//We use 2 to specialize odd id is for tool.
 		for (int i = conn_id_hint; i < CHNL_MAX_CONN; i += 2) {
@@ -450,7 +451,7 @@ pfsd_chnl_accept_end(int32_t conn_id, int mnt_id)
 		ptr->connect_mntid = mnt_id;
 	}
 
-	pthread_mutex_unlock(&pfsd_connect_mutex);
+	pthread_rwlock_unlock(&pfsd_connect_lock);
 }
 
 int
@@ -461,7 +462,7 @@ pfsd_chnl_close(int32_t connect_id, bool forced)
 		return -1;
 
 	pfsd_connect_entry_t *ptr = NULL;
-	pthread_mutex_lock(&pfsd_connect_mutex);
+	pthread_rwlock_wrlock(&pfsd_connect_lock);
 
 	ptr = pfsd_connect_data + connect_id;
 	if (ptr->connect_id != 0) {
@@ -476,7 +477,7 @@ pfsd_chnl_close(int32_t connect_id, bool forced)
 	} else {
 		errno = EINVAL;
 	}
-	pthread_mutex_unlock(&pfsd_connect_mutex);
+	pthread_rwlock_unlock(&pfsd_connect_lock);
 	return result;
 }
 
@@ -486,7 +487,7 @@ pfsd_chnl_close_begin(int32_t connect_id)
 	assert (pfsd_is_valid_connid(connect_id));
 	int result = -1;
 	pfsd_connect_entry_t *ptr = NULL;
-	pthread_mutex_lock(&pfsd_connect_mutex);
+	pthread_rwlock_wrlock(&pfsd_connect_lock);
 
 	ptr = pfsd_connect_data + connect_id;
 	if (ptr->connect_id != 0) {
@@ -508,7 +509,7 @@ pfsd_chnl_close_begin(int32_t connect_id)
 void
 pfsd_chnl_close_end()
 {
-	pthread_mutex_unlock(&pfsd_connect_mutex);
+	pthread_rwlock_unlock(&pfsd_connect_lock);
 }
 
 bool pfsd_is_valid_connid(int32_t cid)
