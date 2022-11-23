@@ -63,13 +63,11 @@ endif()
 message("${CURVE_LIBS}")
 
 target_link_libraries(pfs
-    -Wl,--start-group
     ${CURVE_LIBS}
     rt
     pthread
     dl
     aio
-    -Wl,--end-group
 )
 
 set_property(TARGET pfs PROPERTY POSITION_INDEPENDENT_CODE ON)
