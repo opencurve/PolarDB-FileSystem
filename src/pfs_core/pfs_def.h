@@ -26,6 +26,4 @@
 #define STATIC_ASSERT(sentence) \
 	typedef __attribute__ ((unused)) char __sassert[(sentence)*2-1];
 
-#define OUT
-
 #endif // _PFS_DEF_H_
