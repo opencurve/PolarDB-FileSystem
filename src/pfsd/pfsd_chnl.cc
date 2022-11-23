@@ -31,25 +31,34 @@ static pthread_mutex_t pfsd_connect_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pfsd_connect_entry_t pfsd_connect_data[CHNL_MAX_CONN];
 
 #ifndef PFSD_SERVER
+// Note, id 0 is not used
 static int
 pfsd_connect_add_data(int32_t connect_id, void *data, pfsd_chnl_op *op)
 {
-	int i;
+	static int hint = 1;
+	int i, count = CHNL_MAX_CONN;
 	pfsd_connect_entry_t *result = NULL;
 	if (!pfsd_is_valid_connid(connect_id)) {
 		errno = EINVAL;
 		return -1;
 	}
 	pthread_mutex_lock(&pfsd_connect_mutex);
-	// skip id 0
-	for (i = 1; i < CHNL_MAX_CONN; ++i) {
-		if (pfsd_connect_data[i].connect_id == 0) {
+	i = hint;
+	while (count) {
+		if (i != 0 && pfsd_connect_data[i].connect_id == 0) {
 			result = &pfsd_connect_data[i];
 			result->connect_id = connect_id;
 			result->connect_data = data; /* type chnl_ctx_shm_t for SHM */
 			result->connect_op = op;
+			hint = i + 1;
+			if (hint == CHNL_MAX_CONN)
+				hint = 1; // skip id 0
 			break;
 		}
+		i++;
+		if (i == CHNL_MAX_CONN)
+			i = 1; // skip id 0
+		count--;
 	}
 	pthread_mutex_unlock(&pfsd_connect_mutex);
 
