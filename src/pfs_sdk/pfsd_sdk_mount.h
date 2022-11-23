@@ -51,6 +51,9 @@ void	pfs_mountargs_put(struct mountargs *mp);
 int	pfs_mountargs_foreach(int (*cb)(struct mountargs *, void *arg),
 		void *arg);
 int	pfs_mountargs_exists(const char *pbdname);
+int	pfs_mountargs_inprogress(const char *pbdname);
+void	pfs_mountargs_add_inprogress(struct mountargs *mp);
+void	pfs_mountargs_remove_inprogress(struct mountargs *mp);
 int	pfs_mountargs_rdlock(struct mountargs *mp);
 int	pfs_mountargs_wrlock(struct mountargs *mp);
 int	pfs_mountargs_unlock(struct mountargs *mp);

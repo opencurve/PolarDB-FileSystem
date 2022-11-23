@@ -32,6 +32,7 @@ pthread_mutex_t pfs_mount_epoch_mtx = PTHREAD_MUTEX_INITIALIZER;
 extern pthread_mutex_t pfs_init_mtx;
 typedef TAILQ_HEAD(mount_list, mountargs) mount_list_t;
 static mount_list_t mount_list = TAILQ_HEAD_INITIALIZER(mount_list);
+static mount_list_t mount_inprogress_list = TAILQ_HEAD_INITIALIZER(mount_inprogress_list);
 
 struct mountargs *
 pfs_mountargs_alloc(void)
@@ -143,6 +144,31 @@ pfs_mountargs_exists(const char *pbdname)
 		}
 	}
 	return mp != NULL;
+}
+
+int
+pfs_mountargs_inprogress(const char *pbdname)
+{
+	struct mountargs *mp = NULL;
+
+	TAILQ_FOREACH(mp, &mount_inprogress_list, link) {
+		if (!strcmp(pbdname, mp->pbd_name)) {
+			break;
+		}
+	}
+	return mp != NULL;
+}
+
+void
+pfs_mountargs_add_inprogress(struct mountargs *mp)
+{
+	TAILQ_INSERT_HEAD(&mount_inprogress_list, mp, link);
+}
+
+void
+pfs_mountargs_remove_inprogress(struct mountargs *mp)
+{
+	TAILQ_REMOVE(&mount_inprogress_list, mp, link);
 }
 
 void
