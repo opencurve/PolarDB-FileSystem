@@ -27,8 +27,6 @@
 #define FLK_LEN	1024
 #define MOUNT_PREPARE_TIMEOUT_MS (30 * 1000)
 
-int pfs_mount_epoch;                                                     
-pthread_mutex_t pfs_mount_epoch_mtx = PTHREAD_MUTEX_INITIALIZER;
 extern pthread_mutex_t pfs_init_mtx;
 typedef TAILQ_HEAD(mount_list, mountargs) mount_list_t;
 static mount_list_t mount_list = TAILQ_HEAD_INITIALIZER(mount_list);
@@ -358,7 +356,6 @@ pfs_mount_atfork_child()
 	TAILQ_INIT(&mount_list);
 	TAILQ_INIT(&mount_inprogress_list);
 	pthread_mutex_init(&pfs_init_mtx, NULL);
-	pthread_mutex_init(&pfs_mount_epoch_mtx, NULL);
 }
 
 void
