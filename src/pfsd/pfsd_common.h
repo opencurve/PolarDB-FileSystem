@@ -27,6 +27,13 @@
 #include <errno.h>
 #include <execinfo.h>
 
+#ifndef likely
+	#define likely(c) __builtin_expect(!!(c), 1)
+#endif
+#ifndef unlikely
+	#define unlikely(c)  __builtin_expect(!!(c), 0)
+#endif
+
 #define PFSD_SHM_MAGIC (0x0133C96C)
 
 #define PFSD_INVALID_PID (pid_t(0))

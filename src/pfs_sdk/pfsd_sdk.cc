@@ -43,7 +43,7 @@ static int s_timeout_ms = 20 * 1000;
 static int s_remount_timeout_ms = 2000 * 1000;
 
 #define CHECK_WRITABLE(mp) do { \
-	if (!pfsd_writable((mp)->flags)) { \
+	if (unlikely(!pfsd_writable((mp)->flags))) { \
 		pfs_mountargs_put(mp); \
 		errno = EROFS; \
 		return -1; \
@@ -52,7 +52,7 @@ static int s_remount_timeout_ms = 2000 * 1000;
 
 #define CHECK_MOUNT2(mp, pbdname, mode) do { \
 	mp = pfs_mountargs_find((pbdname), mode); \
-	if (mp == NULL) { \
+	if (unlikely(mp == NULL)) { \
 		PFSD_CLIENT_ELOG("No such device %s mounted", (pbdname));\
 		errno = ENODEV; \
 		return -1; \
@@ -63,7 +63,7 @@ static int s_remount_timeout_ms = 2000 * 1000;
 
 #define CHECK_MOUNT_RETVAL(mp, pbdname, retval) do { \
 	mp = pfs_mountargs_find((pbdname), RDLOCK); \
-	if (mp == NULL) { \
+	if (unlikely(mp == NULL)) { \
 		PFSD_CLIENT_ELOG("No such device %s mounted", (pbdname));\
 		errno = ENODEV; \
 		return retval; \
@@ -221,7 +221,7 @@ failed:
 }
 
 #define CHECK_STALE(rsp) do {\
-	if (rsp->error == ESTALE) { \
+	if (unlikely(rsp->error == ESTALE)) { \
 		PFSD_CLIENT_LOG("Stale request, rsp type %d!!!", rsp->type); \
 		rsp->error = 0; \
 		pfsd_chnl_update_meta(conn_id, req->mntid); \
@@ -605,19 +605,19 @@ pfsd_creat(const char *pbdpath, mode_t mode)
 }
 
 #define PFSD_SDK_GET_FILE(fd) do {\
-	if (!PFSD_FD_ISVALID(fd)) {\
+	if (unlikely(!PFSD_FD_ISVALID(fd))) {\
 		errno = EBADF; \
 		return -1; \
 	}\
 	fd = PFSD_FD_RAW(fd); \
 	file = pfsd_get_file(fd, false); \
-	if (file == NULL) { \
+	if (unlikely(file == NULL)) { \
 		PFSD_CLIENT_ELOG("bad fd %d", fd);\
 		errno = EBADF; \
 		return -1; \
 	} \
 	mp = file->f_mp; \
-	if (mp == NULL) { \
+	if (unlikely(mp == NULL)) { \
 		pfsd_put_file(file, NULL); \
 		errno = ENODEV; \
 		return -1; \
@@ -688,12 +688,12 @@ pfsd_pread(int fd, void *buf, size_t len, off_t off)
 static ssize_t
 pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len, off_t off)
 {
-	if (buf == NULL) {
+	if (unlikely(buf == NULL)) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	if (len > PFSD_MAX_IOSIZE) {
+	if (unlikely(len > PFSD_MAX_IOSIZE)) {
 		/* may shorten read */
 		PFSD_CLIENT_LOG("pread len %lu is too big for fd %d, cast to 4MB.", len, file->f_fd);
 		len = PFSD_MAX_IOSIZE;
@@ -708,14 +708,14 @@ pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len, off_t off)
 
 	off_t off2 = off;
 
-	if (off2 < 0) {
+	if (unlikely(off2 < 0)) {
 		errno = EINVAL;
 		return -1;
 	}
 
 retry:
-	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, len,
-	    (void**)&rsp, (void**)&rbuf, (long*)(&ch)) != 0) {
+	if (unlikely(pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, len,
+	    (void**)&rsp, (void**)&rbuf, (long*)(&ch)) != 0)) {
 		errno = ENOMEM;
 		return -1;
 	}
@@ -735,7 +735,7 @@ retry:
 		memcpy(buf, rbuf, rsp->r_rsp.r_len);
 
 	ss = rsp->r_rsp.r_len;
-	if (ss < 0) {
+	if (unlikely(ss < 0)) {
 		errno = rsp->error;
 		PFSD_CLIENT_ELOG("pread fd %d ino %ld error: %s", file->f_fd,
 		    file->f_inode, strerror(errno));
@@ -761,7 +761,7 @@ pfsd_write(int fd, const void *buf, size_t len)
 		if (to_write > PFSD_MAX_IOSIZE)
 			to_write = PFSD_MAX_IOSIZE;
 		rc = pfsd_file_pwrite(file, cbuf+total, to_write, OFFSET_FILE_POS);
-		if (rc > 0) {
+		if (likely(rc > 0)) {
 			total += rc;
 			len -= rc;
 		} else {
@@ -783,7 +783,7 @@ pfsd_pwrite(int fd, const void *buf, size_t len, off_t off)
 	ssize_t rc = 0, total = 0, to_write = 0;
 	int err = 0;
 
-	if (off < 0) {
+	if (unlikely(off < 0)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -796,7 +796,7 @@ pfsd_pwrite(int fd, const void *buf, size_t len, off_t off)
 		if (to_write > PFSD_MAX_IOSIZE)
 			to_write = PFSD_MAX_IOSIZE;
 		rc = pfsd_file_pwrite(file, cbuf+total, to_write, off+total);
-		if (rc > 0) {
+		if (likely(rc > 0)) {
 			total += rc;
 			len -= rc;
 		} else {
@@ -814,7 +814,7 @@ pfsd_pwrite(int fd, const void *buf, size_t len, off_t off)
 static ssize_t
 pfsd_file_pwrite(pfsd_file_t *file, const void *buf, size_t len, off_t off)
 {
-	if (buf == NULL) {
+	if (unlikely(buf == NULL)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -826,16 +826,16 @@ pfsd_file_pwrite(pfsd_file_t *file, const void *buf, size_t len, off_t off)
 	ssize_t ss = -1;
 	const int conn_id = file->f_conn_id;
 
-	if (!pfsd_writable(file->f_mp->flags)) {
+	if (unlikely(!pfsd_writable(file->f_mp->flags))) {
 		errno = EROFS;
 		return -1;
 	}
 
-	if (len == 0) {
+	if (unlikely(len == 0)) {
 		return 0;
 	}
 
-	if (len > PFSD_MAX_IOSIZE) {
+	if (unlikely(len > PFSD_MAX_IOSIZE)) {
 		PFSD_CLIENT_ELOG("pwrite len %lu is too big for fd %d.", len, file->f_fd);
 		errno = EFBIG;
 		return -1;
@@ -847,15 +847,15 @@ pfsd_file_pwrite(pfsd_file_t *file, const void *buf, size_t len, off_t off)
 	else if (off == OFFSET_FILE_POS)
 		 off2 = file->f_offset;
 
-	if (off2 < 0 && off2 != OFFSET_FILE_SIZE) {
+	if (unlikely(off2 < 0 && off2 != OFFSET_FILE_SIZE)) {
 		PFSD_CLIENT_ELOG("pwrite wrong off2 %lu for fd %d.", off2, file->f_fd);
 		errno = EINVAL;
 		return -1;
 	}
 
 retry:
-	if (pfsd_chnl_buffer_alloc(conn_id, len, (void**)&req, 0,
-	    (void**)&rsp, (void**)&wbuf, (long*)(&ch)) != 0) {
+	if (unlikely(pfsd_chnl_buffer_alloc(conn_id, len, (void**)&req, 0,
+	    (void**)&rsp, (void**)&wbuf, (long*)(&ch)) != 0)) {
 		errno = ENOMEM;
 		return -1;
 	}
@@ -877,7 +877,7 @@ retry:
 		CHECK_STALE(rsp);
 
 	ss = rsp->w_rsp.w_len;
-	if (ss < 0) {
+	if (unlikely(ss < 0)) {
 		errno = rsp->error;
 		PFSD_CLIENT_ELOG("pwrite fd %d ino %ld error: %s", file->f_fd,
 		    file->f_inode, strerror(errno));
@@ -1318,8 +1318,8 @@ pfsd_file_lseek(pfsd_file_t *file, off_t offset, int whence)
 
 retry:
 	/* ask pfsd to seek end */
-	if (pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, 0,
-	    (void**)&rsp, NULL, (long*)(&ch)) != 0) {
+	if (unlikely(pfsd_chnl_buffer_alloc(conn_id, 0, (void**)&req, 0,
+	    (void**)&rsp, NULL, (long*)(&ch)) != 0)) {
 		errno = ENOMEM;
 		return -1;
 	}
@@ -1335,7 +1335,7 @@ retry:
 	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
 
-	if (rsp->l_rsp.l_offset < 0) {
+	if (unlikely(rsp->l_rsp.l_offset < 0)) {
 		errno = rsp->error;
 		rv = off_t(-1);
 		PFSD_CLIENT_ELOG("lseek %ld off %ld error: %s", file->f_inode,
