@@ -302,6 +302,7 @@ pfsd_chnl_get_logic_id(int32_t connect_id)
 	return id;
 }
 
+#ifndef PFSD_SERVER
 /* client side */
 void
 pfsd_chnl_update_meta(int32_t connect_id, long meta)
@@ -329,6 +330,7 @@ pfsd_chnl_abort(int32_t connect_id, pid_t pid)
 	pfsd_connect_put_entry(connect_id);
 	return iresult;
 }
+#endif
 
 /* server side */
 int
