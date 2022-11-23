@@ -36,10 +36,14 @@ struct mountargs *
 pfs_mountargs_alloc(void)
 {
 	struct mountargs *mp;
+	pthread_rwlockattr_t attr;
 
+	pthread_rwlockattr_init(&attr);
+	pthread_rwlockattr_setkind_np(&attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
 	mp = PFSD_MALLOC(struct mountargs);
 	bzero(mp, sizeof(*mp));
-	pthread_rwlock_init(&mp->rwlock, NULL);
+	pthread_rwlock_init(&mp->rwlock, &attr);
+	pthread_rwlockattr_destroy(&attr);
 	mp->hostid_lock_fd = -1;
 	mp->meta_lock_fd = -1;
 	mp->conn_id = -1;

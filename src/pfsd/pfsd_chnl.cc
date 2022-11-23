@@ -26,7 +26,7 @@
 #include "pfsd_chnl.h"
 #include "pfsd_chnl_impl.h"
 
-static pthread_rwlock_t pfsd_connect_lock = PTHREAD_RWLOCK_INITIALIZER;
+static pthread_rwlock_t pfsd_connect_lock = PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP;
 
 static pfsd_connect_entry_t pfsd_connect_data[CHNL_MAX_CONN];
 
@@ -72,7 +72,11 @@ pfsd_connect_add_data(int32_t connect_id, void *data, pfsd_chnl_op *op)
 
 void pfsd_connect_child_post(void)
 {
-	pthread_rwlock_init(&pfsd_connect_lock, NULL);
+	pthread_rwlockattr_t attr;
+	pthread_rwlockattr_init(&attr);
+	pthread_rwlockattr_setkind_np(&attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
+	pthread_rwlock_init(&pfsd_connect_lock, &attr);
+	pthread_rwlockattr_destroy(&attr);
 	memset(pfsd_connect_data, 0, sizeof(pfsd_connect_data));
 }
 
