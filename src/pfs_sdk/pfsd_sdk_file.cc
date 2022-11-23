@@ -33,12 +33,13 @@ bool pfsd_writable(int flags)
 
 
 static char work_dir[PFS_MAX_PATHLEN];
-static pthread_rwlock_t sdk_work_dir_rwlock;
+static pthread_rwlock_t sdk_work_dir_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 static int fdtbl_free_last = -1;
 static pfsd_file_t *fdtbl[PFSD_MAX_NFD];
 static int fdtbl_nopen;
-static pthread_mutex_t fdtbl_mtx;
+static pthread_mutex_t fdtbl_mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t pfsd_chdir_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static inline pfsd_file_t*
 fd_to_file(int fd)
@@ -51,10 +52,6 @@ fd_to_file(int fd)
 
 void pfsd_sdk_file_init()
 {
-	int err = pthread_mutex_init(&fdtbl_mtx, NULL);
-	err = err;
-	assert(err == 0);
-	pthread_rwlock_init(&sdk_work_dir_rwlock, NULL);
 }
 
 void pfsd_sdk_file_reinit()
@@ -67,7 +64,11 @@ void pfsd_sdk_file_reinit()
 	memset(fdtbl, 0, sizeof(*fdtbl));
 	fdtbl_nopen = 0;
 
-	pthread_rwlock_init(&sdk_work_dir_rwlock, NULL);
+	err = pthread_rwlock_init(&sdk_work_dir_rwlock, NULL);
+	assert(err == 0);
+
+	err = pthread_mutex_init(&pfsd_chdir_mtx, NULL);
+	assert(err == 0);
 }
 
 pfsd_file_t *
@@ -213,8 +214,6 @@ pfsd_close_file(pfsd_file_t *f)
 
 	return err;
 }
-
-static pthread_mutex_t pfsd_chdir_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 bool
 pfsd_chdir_begin()
