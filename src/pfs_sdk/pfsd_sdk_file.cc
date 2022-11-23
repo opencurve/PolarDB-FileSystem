@@ -51,25 +51,17 @@ fd_to_file(int fd)
 
 void pfsd_sdk_file_init()
 {
-	pthread_mutexattr_t attr;
-	int err = pthread_mutexattr_init(&attr);
-	pfsd_file_t *file = NULL;
-	err |= pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-	err |= pthread_mutex_init(&fdtbl_mtx, &attr);
-	err |= pthread_mutexattr_destroy(&attr);
-	assert (err == 0);
+	int err = pthread_mutex_init(&fdtbl_mtx, NULL);
+	err = err;
+	assert(err == 0);
 	pthread_rwlock_init(&sdk_work_dir_rwlock, NULL);
 }
 
 void pfsd_sdk_file_reinit()
 {
-	pthread_mutexattr_t attr;
-	int err = pthread_mutexattr_init(&attr);
-	pfsd_file_t *file = NULL;
-	err |= pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-	err |= pthread_mutex_init(&fdtbl_mtx, &attr);
-	err |= pthread_mutexattr_destroy(&attr);
-	assert (err == 0);
+	int err = pthread_mutex_init(&fdtbl_mtx, NULL);
+	err = err;
+	assert(err == 0);
 
 	fdtbl_free_last = -1;
 	memset(fdtbl, 0, sizeof(*fdtbl));
