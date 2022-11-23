@@ -72,7 +72,6 @@ int main(int argc, char* argv[]) {
         printf("mount failed : %s %d\n", pbd1.c_str(), errno);
         return -1;
     }
-    printf("result %d\n", r);
 
     printf("mounting %s\n", pbd2.c_str());
     r = pfsd_mount(cluster, pbd2.c_str(), host_id, flags);
@@ -80,7 +79,6 @@ int main(int argc, char* argv[]) {
         printf("mount failed : %s %d\n", pbd2.c_str(), errno);
         return -1;
     }
-    printf("mounting %s\n", pbd2.c_str());
 
     int fd1 = test_file(cluster, host_id, pbd1_path, pbd1);
     int fd2 = test_file(cluster, host_id, pbd2_path, pbd2);
@@ -92,7 +90,5 @@ int main(int argc, char* argv[]) {
     pfsd_close(fd1);
     pfsd_close(fd2);
 
-
     return 0;
 }
-
