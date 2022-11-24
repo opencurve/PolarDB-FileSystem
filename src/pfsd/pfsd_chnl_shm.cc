@@ -1117,7 +1117,7 @@ static pthread_mutex_t mount_epoch_mtx = PTHREAD_MUTEX_INITIALIZER;
 struct mount_epoch_entry {
 	TAILQ_ENTRY(mount_epoch_entry) link;
 	int epoch;
-	char pbdname[PBD_MAX_NAME_LEN+1];
+	char pbdname[];
 };
 static TAILQ_HEAD(mount_epoch_list, mount_epoch_entry) mount_epoch_list = 
 	TAILQ_HEAD_INITIALIZER(mount_epoch_list);
@@ -1134,10 +1134,10 @@ mount_epoch_entry_get(const char *pbdname)
 	}
 
 	if (e == NULL) {
-		e = (struct mount_epoch_entry *)malloc(sizeof(*e));
+		size_t len = strlen(pbdname)+1;
+		e = (struct mount_epoch_entry *)malloc(sizeof(*e) + len);
 		e->epoch = 0;
-		strncpy(e->pbdname, pbdname, PBD_MAX_NAME_LEN);
-		e->pbdname[PBD_MAX_NAME_LEN] = 0;
+		strcpy(e->pbdname, pbdname);
 		TAILQ_INSERT_HEAD(&mount_epoch_list, e, link);
 	}
 	return e;
