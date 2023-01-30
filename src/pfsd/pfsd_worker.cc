@@ -78,7 +78,7 @@ pfsd_create_workers(int nworkers)
 	worker->w_npollers = g_option.o_pollers;
 	worker->w_io_workers = (pthread_t *)calloc(nworkers, sizeof(pthread_t));
 	worker->w_io_pollers = (pthread_t *)calloc(worker->w_npollers, sizeof(pthread_t));
-	sem_init(&worker->w_sem, PTHREAD_PROCESS_PRIVATE, 0);
+	sem_init(&worker->w_sem, 0, 0);
 
 	return worker;
 }
