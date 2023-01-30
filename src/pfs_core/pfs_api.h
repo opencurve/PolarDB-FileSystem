@@ -61,6 +61,9 @@ extern "C" {
 int	pfs_mount(const char *cluster, const char *pbdname, int host_id, int flags);
 int	pfs_umount(const char *pbdname);
 int	pfs_mount_growfs(const char *pbdname);
+int	pfs_mount_acquire(const char *cluster, const char *pbdname,
+		int host_id, int flags);
+int	pfs_mount_release(const char *pbdname, int host_id);
 
 /* functions both for file and directory */
 int	pfs_rename(const char *oldpbdpath, const char *newpbdpath);

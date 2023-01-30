@@ -33,12 +33,13 @@
 
 #define	MNTFLG_RD		0x0001
 #define	MNTFLG_WR		0x0002
-#define	MNTFLG_RDWR		MNTFLG_RD|MNTFLG_WR
+#define	MNTFLG_RDWR		(MNTFLG_RD|MNTFLG_WR)
 #define MNTFLG_AUTO_INCREASE_EPOCH 0x0004
 #define	MNTFLG_LOG		0x0010
 #define	MNTFLG_TOOL		0x1000	/* Only pfstool will set this flag,
 				   	   to get max hostid to instead itself */
 #define	MNTFLG_PFSD		0x0100
+#define MNTFLG_PFSD_INTERNAL	0x0200
 #define MNTFLG_DISCARD_BYFORCE	0x100000	/* discard by force */
 #define MNTFLG_PAXOS_BYFORCE	0x200000	/* paxos acquired by force */
 
@@ -151,12 +152,9 @@ int		pfs_mount_increase_epoch(const char *pbdname);
 int		pfs_remount(const char *cluster, const char *pbdname, int host_id, int flags);
 int		pfs_umount(const char *pbdname);
 int		pfs_mount_growfs(const char *pbdname);
-}
-
 int		pfs_mount_acquire(const char *cluster, const char *pbdname, int host_id, int flags);
 int		pfs_mount_release(const char *pbdname, int host_id);
-
-
+}
 
 pfs_mount_t *	pfs_get_mount(const char *pbdname);
 pfs_mount_t *	pfs_get_mount_byid(int mntid);
@@ -223,6 +221,12 @@ static inline bool
 pfs_ispfsd(pfs_mount_t *mnt)
 {
 	return (mnt->mnt_flags & MNTFLG_PFSD) == MNTFLG_PFSD;
+}
+
+static inline bool                                                              
+pfs_ispfsd_internal(pfs_mount_t *mnt)                                           
+{                                                                               
+	return !!(mnt->mnt_flags & MNTFLG_PFSD_INTERNAL);
 }
 
 #endif	/* _PFS_MOUNT_H_ */

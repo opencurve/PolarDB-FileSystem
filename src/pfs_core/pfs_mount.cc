@@ -690,7 +690,8 @@ remount:
 	}
 
 	/* For pfsd, paxos_hostid_local_lock is moved up to SDK side */
-	if (!pfs_ispfsd(mnt) && !pfs_istool(mnt) && pfs_writable(mnt)) {
+	if ((!pfs_ispfsd(mnt) || pfs_ispfsd_internal(mnt)) &&
+		!pfs_istool(mnt) && pfs_writable(mnt)) {
 		fd = paxos_hostid_local_lock(pbdname, DEFAULT_MAX_HOSTS + 1,
 		    __func__);
 		if (fd < 0) {
