@@ -546,6 +546,12 @@ pfs_diskdev_wait_io(pfs_dev_t *dev, pfs_ioq_t *ioq, pfs_devio_t *io)
 	return NULL;
 }
 
+static int
+pfs_diskdev_increase_epoch(pfs_dev_t *dev)
+{
+	return 0;
+}
+
 /* register device operations */
 struct pfs_devops pfs_diskdev_ops = {
 	.dop_name		= "disk",
@@ -561,4 +567,5 @@ struct pfs_devops pfs_diskdev_ops = {
 	.dop_need_throttle	= pfs_diskdev_need_throttle,
 	.dop_submit_io 		= pfs_diskdev_submit_io,
 	.dop_wait_io 		= pfs_diskdev_wait_io,
+	.dop_increase_epoch     = pfs_diskdev_increase_epoch
 };
