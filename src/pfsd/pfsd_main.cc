@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
+#include <semaphore.h>
 
 #include "pfsd_common.h"
 #include "pfsd_shm.h"
@@ -27,10 +28,12 @@
 
 #include "pfsd_chnl.h"
 
+static sem_t main_sem;
 static void
 signal_handler(int num)
 {
 	g_stop = true;
+	sem_post(&main_sem);
 }
 
 static void
@@ -53,6 +56,7 @@ int main(int ac, char *av[])
 	if (ac == 1)
 		pfsd_usage(av[0]);
 
+	sem_init(&main_sem, 0, 0);
 	pbdname = g_option.o_pbdname;
 	err = pfsd_write_pid(pbdname);
 	if (err != 0) {
@@ -120,7 +124,10 @@ int main(int ac, char *av[])
 			pfsd_shm_recycle_request(ch);
 		}
 
-		sleep(10);
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_sec++;
+		sem_timedwait(&main_sem, &ts);
 	}
 
 	/* exit */
