@@ -2084,12 +2084,12 @@ pfs_host_incref(int host_id, int flags)
 		++pfsd_mnt_wrref_count;
 		pfsd_mount_shared_infos[host_id].ms_is_rwmnt = true;
 	} else if (*hostid_ref_count != 0) {
-        if (pfsd_mount_shared_infos[host_id].ms_is_rwmnt) {
+		if (pfsd_mount_shared_infos[host_id].ms_is_rwmnt) {
 			pfs_etrace("Repeat ro mount on rw mount with same hostid: "
-	                    "host_id:%d, flags:%d, refcnt: %d\n", host_id,
-	                    flags, *hostid_ref_count);
+				"host_id:%d, flags:%d, refcnt: %d\n", host_id,
+				flags, *hostid_ref_count);
 			errno = EACCES;
-            return -1;
+			return -1;
 		}
 	}
 	++*hostid_ref_count;
