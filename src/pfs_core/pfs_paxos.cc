@@ -486,7 +486,7 @@ paxos_hostid_local_lock(const char *pbdname, int hostid, const char* caller)
 	flk.l_len = hostid > 0 ? FLK_LEN : 0;
 	err = fcntl(fd, F_SETLK, &flk);
 	if (err < 0) {
-		pfs_etrace("cant lock file %s [%d, %d), err=%d, errno=%d\n",
+		pfs_etrace("cant lock file %s [%zd, %zd), err=%d, errno=%d\n",
 		    pathbuf, flk.l_start, flk.l_start + flk.l_len, err,
 		    errno);
 		(void)close(fd);

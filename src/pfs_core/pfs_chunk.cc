@@ -174,7 +174,7 @@ paxos_leader_write(int devi, char *buf, size_t buflen)
 	PFS_ASSERT(buflen == PBD_SECTOR_SIZE);
 	err = pfsdev_pwrite(devi, buf, buflen, PFS_BLOCK_SIZE);
 	if (err < 0) {
-		pfs_etrace("failed to write paxos leader: %d\n");
+		pfs_etrace("failed to write paxos leader: %d\n", err);
 		return err;
 	}
 
@@ -222,7 +222,7 @@ metacache_check_leader(int fd, int iochd)
 	/* read paxos leader from metacache */
 	rlen = pread(fd, &flr, sizeof(flr), sizeof(metacache_header_t));
 	if (rlen != sizeof(flr)) {
-		pfs_etrace("read fd %d @ 0 failed, rlen=%d, errno=%d\n",
+		pfs_etrace("read fd %d @ 0 failed, rlen=%zd, errno=%d\n",
 		    fd, rlen, errno);
 		ERR_RETVAL(EIO);
 	}
@@ -249,7 +249,7 @@ static bool
 chunk_isvalid(const pfs_chunk_phy_t *phyck, uint32_t ckid)
 {
 	if (!chunk_magic_valid(phyck->ck_number, phyck->ck_magic)) {
-		pfs_etrace("chunk %llu pfs magic mismatch %#llx vs %#llx\n",
+		pfs_etrace("chunk %" PRIu64 " pfs magic mismatch %#llx vs %#llx\n",
 		    phyck->ck_number, (unsigned long long)phyck->ck_magic,
 		    (unsigned long long)PFS_CHUNK_MAGIC);
 		return false;
@@ -267,7 +267,7 @@ chunk_isvalid(const pfs_chunk_phy_t *phyck, uint32_t ckid)
 		return false;
 	}
 	if (phyck->ck_number != ckid) {
-		pfs_etrace("chunk %u id mismatch %u vs %u\n", ckid,
+		pfs_etrace("chunk %u id mismatch %" PRIu64 " vs %u\n", ckid,
 		    phyck->ck_number, ckid);
 		return false;
 	}
@@ -372,7 +372,7 @@ metacache_check_bust(pfs_chunkstream_desc_t *desc)
 		crc = crc32c((uint32_t)~1, (uint8_t *)bust, bustsz);
 		if (crc != fcrc) {
 			pfs_etrace("metacache chunk %u BUST checksum mismatch,"
-			    " %u vs %u\n", crc, fcrc);
+			    " %u vs %u\n", ckid, crc, fcrc);
 			ERR_RETVAL(EINVAL);
 		}
 	}
@@ -725,7 +725,7 @@ pfs_chunk_readstream_open(const pfs_chunkstream_desc_t *desc, int chunkid)
 	cr->cr_ncrcfrag = 0;
 
 	pfs_itrace("open read stream success, pbdname=%s, io_desc=%d, metafd=%d,"
-	    " ckid=%d, metasz=%u, streamsz=%lu, crcsz=%ld\n", desc->csd_pbdname,
+	    " ckid=%d, metasz=%" PRIu64 ", streamsz=%" PRIu64 ", crcsz=%" PRIu64 "\n", desc->csd_pbdname,
 	    desc->csd_ioch_desc, desc->csd_meta_fd,
 	    cr->cr_chunk_stream.cs_ckid, cr->cr_metasz, cr->cr_streamsz,
 	    cr->cr_crcsz);
@@ -734,7 +734,7 @@ pfs_chunk_readstream_open(const pfs_chunkstream_desc_t *desc, int chunkid)
 
 fail:
 	pfs_itrace("open read stream fail, pbdname=%s, io_desc=%d, metafd=%d,"
-	    " ckid=%d, metasz=%u, streamsz=%lu\n", desc->csd_pbdname,
+	    " ckid=%d, metasz=%" PRIu64 ", streamsz=%" PRIu64 "\n", desc->csd_pbdname,
 	    desc->csd_ioch_desc, desc->csd_meta_fd,
 	    cr->cr_chunk_stream.cs_ckid, cr->cr_metasz, cr->cr_streamsz);
 

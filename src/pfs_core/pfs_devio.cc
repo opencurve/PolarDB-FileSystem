@@ -329,7 +329,7 @@ pfs_io_wait(pfs_devio_t *io, pfs_dev_t *dev)
 		return NULL;
 	if (nio->io_error < 0)
 		pfs_etrace("io failed! error: %d, pbdname: %s, op: %d, "
-		    "buf: %#x, len: %lu, bda: %lu, flags: %d\n",
+		    "buf: 0x%p, len: %lu, bda: %lu, flags: %d\n",
 		    nio->io_error, nio->io_dev->d_devname, nio->io_op,
 		    nio->io_buf, nio->io_len, nio->io_bda, nio->io_flags);
 

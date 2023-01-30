@@ -292,10 +292,10 @@ pfs_curvedev_info(pfs_dev_t *dev, struct pbdinfo *pi)
     pi->pi_disksize = (size / pi->pi_chunksize) * pi->pi_chunksize;
     pi->pi_rwtype = 1; // FIXME
 
-    pfs_itrace("pfs_curvedev_info get pi_pbdno %u, pi_rwtype %d, pi_unitsize %llu, "
-        "pi_chunksize %llu, pi_disksize %llu\n", pi->pi_pbdno, pi->pi_rwtype,
+    pfs_itrace("pfs_curvedev_info get pi_pbdno %u, pi_rwtype %d, pi_unitsize %" PRIu64 ", "
+        "pi_chunksize %" PRIu64 ", pi_disksize %" PRIu64 "\n", pi->pi_pbdno, pi->pi_rwtype,
         pi->pi_unitsize, pi->pi_chunksize, pi->pi_disksize);
-    pfs_itrace("pfs_curvedev_info waste size: %llu\n", size - pi->pi_disksize);
+    pfs_itrace("pfs_curvedev_info waste size: %zd\n", size - pi->pi_disksize);
     return err;
 }
 

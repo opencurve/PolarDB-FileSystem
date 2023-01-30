@@ -326,7 +326,7 @@ chunk_copy(fscp_info_t *cpinfo, int ckid, oidvect_t *pov)
 		err = block_copy(cpinfo, blkno, iobuf,
 		    cpinfo->i_nfrag * PFS_FRAG_SIZE, holeoff);
 		if (err < 0) {
-			pfs_etrace("copy %lld blk in chunk %d failed, err=%d\n",
+			pfs_etrace("copy %" PRIu64 " blk in chunk %d failed, err=%d\n",
 			    blkno, ckid, err);
 			free(iobuf);
 			return err;

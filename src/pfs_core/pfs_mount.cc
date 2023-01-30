@@ -300,7 +300,7 @@ pfs_poll_thread_entry(void *arg)
 	struct timespec ts;
 	int err;
 
-	pfs_itrace("poll thread starts, period = %ds\n", poll_interval);
+	pfs_itrace("poll thread starts, period = %" PRIi64 "s\n", poll_interval);
 
 	pfs_wait_inited(mnt);
 	if (pfs_init_failed(mnt))
@@ -1601,8 +1601,8 @@ pfs_bd_thread_entry(void *arg)
 		return NULL;
 	bdroot = NULL;
 
-	pfs_itrace("block discard thread starts, interval = %d, period = %d"
-	    ", ninp = %d\n", discard_interval, discard_period, discard_ninp);
+	pfs_itrace("block discard thread starts, interval = %" PRIi64 ", period = %" PRIi64
+	    ", ninp = %" PRIi64 "\n", discard_interval, discard_period, discard_ninp);
 	err = 0;
 	for (;;) {
                 clock_gettime(CLOCK_REALTIME, &ts);
@@ -1629,7 +1629,7 @@ pfs_bd_thread_entry(void *arg)
 		if (bdroot == NULL)
 			continue;
 		if (quiescent) {
-			pfs_itrace("detect discard conflict, sleep %ds\n",
+			pfs_itrace("detect discard conflict, sleep %" PRIu64 "s\n",
 			    discard_period);
 			sleep(discard_period);
 		}
@@ -1927,7 +1927,7 @@ pfs_remount_rw(const char *pbdname, int host_id, int flags)
 	err = pfsdev_reopen(mnt->mnt_ioch_desc, NULL, mnt->mnt_pbdname,
 	    devflags);
 	if (err < 0) {
-		pfs_etrace("reopen failed, err=%d, it is unrecoverable\n");
+		pfs_etrace("reopen failed, err=%d, it is unrecoverable\n", err);
 		exit(EIO);
 	}
 	if (pfsdev_info(mnt->mnt_ioch_desc, &pi) < 0) {

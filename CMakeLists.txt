@@ -139,6 +139,7 @@ set(CPACK_GENERATOR "RPM;DEB")
 set(CPACK_RPM_PACKAGE_AUTOREQ FALSE)
 file(GLOB pfsd_HEADERS
      ${PROJECT_SOURCE_DIR}/src/pfs_sdk/pfsd_sdk.h
+     ${PROJECT_SOURCE_DIR}/src/pfs_core/pfs_trace_func.h
 )
 
 file(GLOB deploy_FILES

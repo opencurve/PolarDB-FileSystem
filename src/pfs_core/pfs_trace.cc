@@ -42,12 +42,15 @@ static pfs_tracebuf_t	pfs_trace_buf[PFS_TRACE_NUM];
 static uint64_t		pfs_trace_idx = 0;
 
 char			pfs_trace_pbdname[PFS_MAX_PBDLEN];
+static void		default_pfs_vtrace(int level, const char *file,
+		const char *func, int line, const char *fmt, va_list ap);
+static pfs_trace_func_t pfs_trace_func = &default_pfs_vtrace;
 
 bool
 pfs_check_ival_trace_level(void *data)
 {
 	int64_t integer_val = *(int64_t*)data;
-	if ((integer_val != PFS_TRACE_OFF) &&
+	if ((integer_val != PFS_TRACE_FATAL) &&
 	    (integer_val != PFS_TRACE_ERROR) &&
 	    (integer_val != PFS_TRACE_WARN) &&
 	    (integer_val != PFS_TRACE_INFO) &&
@@ -58,9 +61,9 @@ pfs_check_ival_trace_level(void *data)
 }
 
 /* print level of trace */
-int64_t trace_plevel = PFS_TRACE_INFO;
-PFS_OPTION_REG(trace_plevel, pfs_check_ival_trace_level);
-
+int64_t pfs_trace_plevel = PFS_TRACE_INFO;
+PFS_OPTION_REG(pfs_trace_plevel, pfs_check_ival_trace_level);
+ 
 /*
  * Create a dummy tracectl to INIT trace sector.
  * Otherwise, if pfs_verbtrace() isn't called, trace sector may be not created
@@ -130,10 +133,9 @@ pfs_trace_redirect(const char *pbdname, int hostid)
 	pfs_itrace("host %d redirect trace to %s\n", hostid, logfile);
 }
 
-pfs_log_func_t *pfs_log_functor;
-
-void
-pfs_vtrace(int level, const char *fmt, ...)
+static void
+default_pfs_vtrace(int level, const char *filename, const char *func,
+	int line, const char *fmt, va_list ap)
 {
 	static const char mon_name[][4] = {
 		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -145,8 +147,6 @@ pfs_vtrace(int level, const char *fmt, ...)
 	uint64_t ti;
 	int len;
 	char *buf;
-	int errno_save = errno;
-	va_list ap;
 
 	ti = __atomic_fetch_add(&pfs_trace_idx, 1, __ATOMIC_ACQ_REL);
 	ti = (ti & (PFS_TRACE_NUM - 1));
@@ -161,17 +161,30 @@ pfs_vtrace(int level, const char *fmt, ...)
 	    pfs_trace_levelname(level),
 	    (long)syscall(SYS_gettid));
 	if (len < PFS_TRACE_LEN) {
-		va_start(ap, fmt);
 		vsnprintf(buf + len, PFS_TRACE_LEN - len, fmt, ap);
-		va_end(ap);
 	}
 
-	if (pfs_log_functor != NULL)
-		pfs_log_functor(buf);
-	else
-		fputs(buf, stderr);
+	len = strlen(buf);
+	flockfile(stderr);
+	fprintf(stderr, "%s", buf);
+	if (buf[len-1] != '\n')
+		fputc('\n', stderr);
+	funlockfile(stderr);
+}
 
-	errno = errno_save;
+extern "C" void
+pfs_vtrace(int level, const char *filename, const char *func, int line,
+	const char *fmt, ...)
+{
+	int errno_save = errno;
+	va_list ap;
+
+	va_start(ap, fmt);
+	(*pfs_trace_func)(level, filename, func, line, fmt, ap);
+	va_end(ap);
+ 	errno = errno_save;
+	if (level == PFS_TRACE_FATAL)
+		abort();
 }
 
 static bool
@@ -270,3 +283,31 @@ pfs_trace_handle(int sock, msg_header_t *mh, msg_trace_t *tr)
 
 	return err;
 }
+
+extern "C" {
+void
+pfs_set_trace_func(pfs_trace_func_t func)
+{
+	pfs_trace_func = func;
+}
+
+pfs_trace_func_t
+pfs_get_trace_func()
+{
+	return pfs_trace_func;
+}
+
+int
+pfs_set_trace_level(int level)
+{
+	int old = pfs_trace_plevel;
+	pfs_trace_plevel = level;
+	return old;
+}
+
+int
+pfs_get_trace_level()
+{
+	return pfs_trace_plevel;
+}
+}  // extern "C"

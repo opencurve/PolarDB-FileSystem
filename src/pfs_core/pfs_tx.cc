@@ -104,7 +104,7 @@ pfs_sectbuf_put(pfs_sectbuf_t *sb)
 static void
 txop_dump(pfs_txop_t *top, pfs_logentry_phy_t *le, const char *caller)
 {
-	pfs_dbgtrace("%s: txop %s/%d/%s buf %p, bda %#lx, oi %u, hd %#x, shdw %#x\n",
+	pfs_dbgtrace("%s: txop %s/%d/%s buf %p, bda %#" PRIx64 ", oi %u, hd %p, shdw %p\n",
 	    caller, top->top_func, top->top_line, top->top_name, top->top_buf,
 	    top->top_bda, top->top_idx, top->top_dup_head, top->top_shadow);
 	if (le)

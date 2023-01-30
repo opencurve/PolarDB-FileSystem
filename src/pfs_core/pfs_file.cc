@@ -600,7 +600,7 @@ pfs_file_read(pfs_inode_t *in, void *buf, size_t len, off_t offset,
 			 *
 			 * We should re-check fsize after we re-lock inode.
 			 */
-			pfs_etrace("blkid %llu mapps to %lld\n in read",
+			pfs_etrace("blkid %" PRIi64 "mapps to %" PRIi64 "\n in read",
 			    blkid, dblkno);
 			ERR_RETVAL(EAGAIN);
 		}
@@ -688,7 +688,7 @@ pfs_file_write(pfs_inode_t *in, const void *buf, size_t len, off_t *off,
 			 * now cant find them, so there must be other
 			 * threads deleting it. Interesting to see.
 			 */
-			pfs_etrace("blkid %llu mapps to %lld in write\n",
+			pfs_etrace("blkid %" PRIi64 " mapps to %" PRIi64 " in write\n",
 			    blkid, dblkno);
 			ERR_RETVAL(EAGAIN);
 		}

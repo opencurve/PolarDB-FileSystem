@@ -389,7 +389,7 @@ pfs_trimgroup_flush(pfs_trimgroup_t *grp, int iodesc, pfs_txid_t *tail_txid,
 		PFS_ASSERT(sb->s_txid > grp->g_ltxid && sb->s_txid <= grp->g_rtxid);
 		rv = pfsdev_pwrite(iodesc, sb->s_buf, PBD_SECTOR_SIZE, sb->s_bda);
 		if (rv < 0) {
-			pfs_etrace("trim log failed bda @%lld rv=%d\n",
+			pfs_etrace("trim log failed bda @%" PRIu64 " rv=%d\n",
 			    sb->s_bda, rv);
 			return rv;
 		}
@@ -784,7 +784,7 @@ pfs_log_scan(pfs_log_t *log, char *buf, ssize_t buflen, off_t start_offset,
 			tx = tmp;
 			TAILQ_INSERT_TAIL(txhead, tx, t_next);
 		}
-		pfs_dbgtrace("log scan le %llu\n", le->le_lsn);
+		pfs_dbgtrace("log scan le %" PRIi64 "\n", le->le_lsn);
 		top = NULL;
 		err = pfs_tx_recreate_op(tx, le, top);
 		if (err < 0)
@@ -1047,7 +1047,7 @@ pfs_log_load(pfs_log_t *log, pfs_leader_record_t *latest, log_req_t *req)
 	if (rv < 0)
 		return rv;
 
-	pfs_itrace("Leader before mount: (%llu %llu], latest: (%llu %llu], nle=%d\n",
+	pfs_itrace("Leader before mount: (%llu %llu], latest: (%llu %llu], nle=%zd\n",
 	    (unsigned long long)lr->tail_txid,
 	    (unsigned long long)lr->head_txid,
 	    (unsigned long long)latest->tail_txid,
@@ -1149,7 +1149,7 @@ pfs_log_poll(pfs_log_t *log, const pfs_leader_record_t *latest, log_req_t *req)
 		return rlen;
 
 	pfs_dbgtrace("polled from (%llu %llu]'s head to (%llu %llu]'s head,"
-	    " nle=%d\n",
+	    " nle=%zd\n",
 	    (unsigned long long)lr->tail_txid,
 	    (unsigned long long)lr->head_txid,
 	    (unsigned long long)latest->tail_txid,
@@ -1526,7 +1526,7 @@ pfs_log_handle_trim(pfs_log_t *log, struct req_qhead *work_req)
 	 */
 	PFS_ASSERT(lr->head_txid <= latest->head_txid);
 	if (lr->head_txid < latest->head_txid) {
-		pfs_itrace("LOG_TRIM found lr lags %ld tx in (%llu, %llu], wake"
+		pfs_itrace("LOG_TRIM found lr lags %lld tx in (%llu, %llu], wake"
 		    " up poll thread\n",
 		    (long long)(latest->head_txid - lr->head_txid),
 		    (unsigned long long)lr->head_txid,
@@ -1924,7 +1924,7 @@ pfs_log_preload(pfs_log_t *log)
 	memset(buf, 0, PBD_SECTOR_SIZE);
 	rv = pfsdev_pread(mnt->mnt_ioch_desc, buf, sizeof(buf), PFS_BLOCK_SIZE);
 	if (rv < 0) {
-		pfs_etrace("Read leader @ bda %llu failed, rv=%d\n",
+		pfs_etrace("Read leader @ bda %d failed, rv=%d\n",
 		    PFS_BLOCK_SIZE, rv);
 		return rv;
 	}

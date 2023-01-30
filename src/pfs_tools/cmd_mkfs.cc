@@ -409,7 +409,7 @@ journal_file_make(pfs_mount_t *mnt, size_t jsize)
 	char filepath[PFS_MAX_PATHLEN];
 
 	if ((jsize & (512 - 1)) != 0) {
-		pfs_etrace("Log file size %x must be 512Bytes aligned\n", jsize);
+		pfs_etrace("Log file size %zd must be 512Bytes aligned\n", jsize);
 		exit(EINVAL);
 	}
 
@@ -437,7 +437,7 @@ bool
 chunk_isvalid(const pfs_chunk_phy_t *phyck, uint32_t ckid)
 {
 	if (!chunk_magic_valid(phyck->ck_number, phyck->ck_magic)) {
-		pfs_etrace("chunk %llu pfs magic mismatch %#llx vs %#llx\n",
+		pfs_etrace("chunk %" PRIu64 " pfs magic mismatch %#llx vs %#llx\n",
 		    phyck->ck_number, (unsigned long long)phyck->ck_magic,
 		    (unsigned long long)PFS_CHUNK_MAGIC);
 		return false;
@@ -455,7 +455,7 @@ chunk_isvalid(const pfs_chunk_phy_t *phyck, uint32_t ckid)
 		return false;
 	}
 	if (phyck->ck_number != ckid) {
-		pfs_etrace("chunk %u id mismatch %u vs %u\n", ckid,
+		pfs_etrace("chunk %u id mismatch, %" PRIu64 " vs %u\n", ckid,
 		    phyck->ck_number, ckid);
 		return false;
 	}

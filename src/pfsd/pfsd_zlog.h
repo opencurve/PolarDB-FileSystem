@@ -16,6 +16,7 @@
 #ifndef _PFSD_ZLOG_H_
 #define _PFSD_ZLOG_H_
 
+#include <string.h>
 #include <zlog.h>
 
 #define CHKSVR_LOG_LEVEL_DEBUG  20
@@ -222,8 +223,11 @@ static inline void LogFini() {
 
 extern zlog_category_t *original_zlog_cat;
 
-static inline void wrapper_zlog(const char *buf) {
-    zlog(original_zlog_cat, "", 0, "", 0, __LINE__, ZLOG_LEVEL_INFO, "%s", buf);
+static inline void wrapper_zlog(int level, const char *filename,
+	const char *func, int line, const char *fmt, va_list ap)
+{
+    vzlog(original_zlog_cat, filename, strlen(filename), func, strlen(func),
+          line, ZLOG_LEVEL_INFO, fmt, ap);
 }
 
 #endif

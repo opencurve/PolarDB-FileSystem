@@ -95,7 +95,7 @@ int main(int ac, char *av[])
 		original_zlog_cat = zlog_get_category("pfsd_cat");
 	}
 
-	pfs_log_functor = wrapper_zlog;
+	pfs_set_trace_func(wrapper_zlog);
 
 	fprintf(stderr, "starting pfsd[%d] %s\n", getpid(), pbdname);
 	pfsd_info("starting pfsd[%d] %s", getpid(), pbdname);

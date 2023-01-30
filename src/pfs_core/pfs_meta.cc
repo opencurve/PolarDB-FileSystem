@@ -667,7 +667,7 @@ pfs_metaset_bd_build_index(pfs_anode_t *an, void *data)
 				break;
 
 			default:
-				pfs_etrace("blktag %llu has bad status %u",
+				pfs_etrace("blktag %" PRIu64 " has bad status %u",
 				    mo->mo_number, status);
 				PFS_ASSERT("blktag bad status" == NULL);
 				break;
@@ -853,7 +853,7 @@ pfs_meta_check_chunk(const pfs_chunk_phy_t *phyck)
 	}
 
 	if (mismatch) {
-		pfs_etrace("pfs mismatch occurs in chunk %u."
+		pfs_etrace("pfs mismatch occurs in chunk %" PRIu64 "."
 		    " Make sure mkfs has run!\n", phyck->ck_number);
 		exit(EIO);
 	}
@@ -1087,7 +1087,7 @@ pfs_meta_load_chunks_parallel(pfs_mount_t *mnt, uint32_t oldnck,
 	nthrd = MAX(nthrd, MIN_NTHRD);
 	nthrd = MIN(nthrd, MAX_NTHRD);
 	nthrd = MIN(nthrd, newnck - oldnck);
-	pfs_itrace("load %u chunks by %d threads\n", newnck - oldnck, nthrd);
+	pfs_itrace("load %u chunks by %d threads\n", newnck - oldnck, (int)nthrd);
 
 	/*
 	 * Every task in [0, nthrd) loads nstep chunk at least.
@@ -1389,12 +1389,12 @@ pfs_meta_bd_mark_inp(pfs_mount_t *mnt, int64_t btno)
 		break;
 
 	case BDS_NONE:
-		pfs_itrace("blk %llu has dstatus as %d when marking"
+		pfs_itrace("blk %" PRIu64 " has dstatus as %d when marking"
 		    " discarding\n", btno, bt->bt_dstatus);
 		break;
 
 	default:
-		pfs_etrace("blk %llu has bad status %d when marking"
+		pfs_etrace("blk %" PRIu64 " has bad status %d when marking"
 		    " discarding\n", btno, bt->bt_dstatus);
 		PFS_ASSERT("blk bad status" == NULL);
 		break;
@@ -1436,12 +1436,12 @@ pfs_meta_bd_mark_done(pfs_mount_t *mnt, int64_t btno)
 
 	case BDS_READY:
 	case BDS_NONE:
-		pfs_itrace("blk %llu has dstatus as %d when marking"
+		pfs_itrace("blk %" PRIu64 " has dstatus as %d when marking"
 		    " discarded\n", btno, bt->bt_dstatus);
 		break;
 
 	default:
-		pfs_etrace("blk %llu has bad status %d when marking"
+		pfs_etrace("blk %" PRIu64 " has bad status %d when marking"
 		    " discarded\n", btno, bt->bt_dstatus);
 		PFS_ASSERT("blk bad status" == NULL);
 		break;
@@ -1478,7 +1478,7 @@ pfs_meta_bd_change_index(pfs_mount_t *mnt, pfs_blktag_phy_t *bt)
 		break;
 
 	default:
-		pfs_etrace("blk %llu has bad status %d when changing"
+		pfs_etrace("blk %" PRIu64 " has bad status %d when changing"
 		    " index\n", btno, bt->bt_dstatus);
 		PFS_ASSERT("blk bad status" == NULL);
 		break;

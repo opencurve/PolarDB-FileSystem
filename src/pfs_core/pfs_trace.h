@@ -17,47 +17,55 @@
 #define	_PFS_TRACE_H_
 
 #include <stdarg.h>
+#include <inttypes.h>
 
 #include "trace_pfs_ctx.h"
 #include "pfs_util.h"
+#include "pfs_trace_func.h"
 
-enum {
-	PFS_TRACE_OFF	= 0,
-	PFS_TRACE_ERROR	= 1,
-	PFS_TRACE_WARN	= 2,
-	PFS_TRACE_INFO	= 3,
-	PFS_TRACE_DBG	= 4,
-	PFS_TRACE_DEBUG	= PFS_TRACE_DBG,
-	PFS_TRACE_VERB	= 5,
-};
-
-void	pfs_vtrace(int level, const char *fmt, ...);
-
-extern int64_t trace_plevel;
+extern int64_t pfs_trace_plevel;
 
 #define pfs_trace(level, force, fmt,...) \
 do { \
-	if (level <= trace_plevel || force) \
-		pfs_vtrace(level, fmt, ##__VA_ARGS__); \
+	if (level <= pfs_trace_plevel || force) \
+		pfs_vtrace(level, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__); \
+} while(0)
+
+#define pfs_fatal(fmt,...) \
+do { \
+	pfs_vtrace(PFS_TRACE_FATAL, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__); \
 } while(0)
 
 #define pfs_itrace(fmt,...) \
 do { \
-	if (PFS_TRACE_INFO <= trace_plevel) \
-		pfs_vtrace(PFS_TRACE_INFO, fmt, ##__VA_ARGS__); \
+	if (PFS_TRACE_INFO <= pfs_trace_plevel) \
+		pfs_vtrace(PFS_TRACE_INFO, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__); \
+} while(0)
+
+#define pfs_wtrace(fmt,...) \
+do { \
+	if (PFS_TRACE_WARN <= pfs_trace_plevel) \
+		pfs_vtrace(PFS_TRACE_WARN, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__); \
 } while(0)
 
 #define pfs_etrace(fmt,...) \
 do { \
-	if (PFS_TRACE_ERROR <= trace_plevel) \
-		pfs_vtrace(PFS_TRACE_ERROR, fmt, ##__VA_ARGS__); \
+	if (PFS_TRACE_ERROR <= pfs_trace_plevel) \
+		pfs_vtrace(PFS_TRACE_ERROR, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__); \
 } while(0)
 
 #define pfs_dbgtrace(fmt,...) \
 do { \
-	if (PFS_TRACE_DBG <= trace_plevel) \
-		pfs_vtrace(PFS_TRACE_DBG, fmt, ##__VA_ARGS__); \
+	if (PFS_TRACE_DBG <= pfs_trace_plevel) \
+		pfs_vtrace(PFS_TRACE_DBG, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__); \
 } while(0)
+
+#define pfs_verbtrace(fmt,...) \
+do { \
+	if (PFS_TRACE_VERB <= pfs_trace_plevel) \
+		pfs_vtrace(PFS_TRACE_VERB, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__); \
+} while(0)
+
 
 typedef struct tracectl {
 	const char 	*tc_file;
@@ -68,6 +76,7 @@ typedef struct tracectl {
 	const char	*tc_format;
 } tracectl_t;
 
+/*
 #define	pfs_verbtrace(fmt, ...)	do {					\
 	static tracectl_t _tc = { 					\
 		__FILE__, __func__, __LINE__, 				\
@@ -80,14 +89,12 @@ typedef struct tracectl {
 	if (_tc.tc_enable)						\
 		pfs_trace(_tc.tc_level, true, fmt, ##__VA_ARGS__);	\
 } while (0)
+*/
 
 typedef	struct msg_header	msg_header_t;
 typedef	struct msg_trace	msg_trace_t;
 
 int	pfs_trace_handle(int sock, msg_header_t *mh, msg_trace_t *tr);
 void 	pfs_trace_redirect(const char *pbdname, int hostid);
-
-typedef void pfs_log_func_t(const char *buf);
-extern pfs_log_func_t *pfs_log_functor;
 
 #endif

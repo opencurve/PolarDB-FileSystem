@@ -254,7 +254,7 @@ paxos_leader_write(int devi, char *buf, size_t buflen)
 	PFS_ASSERT(buflen == PBD_SECTOR_SIZE);
 	err = pfsdev_pwrite(devi, buf, buflen, PFS_BLOCK_SIZE);
 	if (err < 0) {
-		pfs_etrace("failed to write paxos leader: %d\n");
+		pfs_etrace("failed to write paxos leader: %d\n", err);
 		return err;
 	}
 
@@ -417,7 +417,7 @@ ossheader_init(pfs_ossfile_header_t *oss, uint32_t nchunk, uint32_t nsumck,
 	oss->oss_ctime = time(NULL);
 	err = strncpy_safe(oss->oss_pbdname, pbdname, sizeof(oss->oss_pbdname));
 	if (err <= 0) {
-		pfs_etrace("pbdname %s is invalid, its length should be (0, %d)\n",
+		pfs_etrace("pbdname %s is invalid, its length should be (0, %zd)\n",
 		    pbdname, sizeof(oss->oss_pbdname));
 		ERR_RETVAL(ENAMETOOLONG);
 	}
@@ -478,7 +478,7 @@ metacache_check_leader(int fd, int iochd)
 	/* read paxos leader from metacache */
 	rlen = pread(fd, &flr, sizeof(flr), 0);
 	if (rlen != sizeof(flr)) {
-		pfs_etrace("read fd %d @ 0 failed, rlen=%d, errno=%d\n",
+		pfs_etrace("read fd %d @ 0 failed, rlen=%zd, errno=%d\n",
 		    fd, rlen, errno);
 		ERR_RETVAL(EIO);
 	}
@@ -570,7 +570,7 @@ metacache_check_bust(int fd, int iochd, uint32_t *nck, uint32_t *nsumck)
 		crc = crc32c((uint32_t)~1, (uint8_t *)bust, bustsz);
 		if (crc != fcrc) {
 			pfs_etrace("metacache chunk %u BUST checksum mismatch,"
-			    " %u vs %u\n", crc, fcrc);
+			    " %u vs %u\n", ckid, crc, fcrc);
 			ERR_RETVAL(EINVAL);
 		}
 

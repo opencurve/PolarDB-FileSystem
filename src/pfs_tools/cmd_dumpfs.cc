@@ -122,8 +122,8 @@ chunk_dump(int chunkid)
 		memset(ck, 0, PBD_SECTOR_SIZE);
 		err = pfsdev_pread(ioch_desc, ck, PBD_SECTOR_SIZE, i * chunksize);
 		if (err < 0 || ck->ck_chunksize != chunksize) {
-			pfs_etrace("read %d chunk header @ %ld len %ld failed,"
-			    " err = %d\n", i, i * chunksize, PBD_SECTOR_SIZE);
+			pfs_etrace("read %d chunk header @ %" PRIu64 " len %d failed,"
+			    " err = %d\n", i, i * chunksize, PBD_SECTOR_SIZE, err);
 			return err;
 		}
 		nchunk = ck->ck_nchunk;

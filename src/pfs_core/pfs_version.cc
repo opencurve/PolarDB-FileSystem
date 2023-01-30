@@ -39,7 +39,7 @@ pfs_version_select(pfs_mount_t *mnt)
 	diskver = mnt->mnt_disk_version =
 		chunk_magic_version(mnt->mnt_chunkv[0]->ck_phyck->ck_magic);
 
-	pfs_itrace("pfs version: current %llu vs on-disk %llu\n",
+	pfs_itrace("pfs version: current %" PRIu64 " vs on-disk %" PRIu64 "\n",
 	    pfs_current_version, diskver);
 
 	if (pfs_current_version < diskver)
@@ -54,7 +54,7 @@ pfs_version_select(pfs_mount_t *mnt)
 		mnt->mnt_run_version = diskver;
 	else
 		mnt->mnt_run_version = pfs_current_version;
-	pfs_itrace("pfs run version: %llu\n",  mnt->mnt_run_version);
+	pfs_itrace("pfs run version: %" PRIu64 "\n",  mnt->mnt_run_version);
 	return 0;
 }
 
@@ -74,7 +74,7 @@ pfs_version_upgrade(pfs_mount_t *mnt)
 	if (mnt->mnt_disk_version == mnt->mnt_run_version)
 		return 0;
 
-	pfs_itrace("pfs upgrade version from %llu to %llu\n",
+	pfs_itrace("pfs upgrade version from %" PRIu64 " to %" PRIu64 "\n",
 	    mnt->mnt_disk_version, mnt->mnt_run_version);
 	phyck = mnt->mnt_chunkv[0]->ck_phyck;
 	phyck->ck_magic = chunk_magic_make(0);
