@@ -489,10 +489,18 @@ chnl_listen_shm_thread_entry(void *arg)
 	char buf[2 * PFS_MAX_PATHLEN]; /* must bigger than PFS_MAX_PATHLEN */
 	ssize_t numRead = 0;
 	int nfd = ctx->svr.shm_inotify_fd;
+	struct pollfd pollinf;
+
 	while (!g_stop) {
 		do {
+			pollinf.fd = nfd;
+			pollinf.events = POLLIN;
+			pollinf.revents = 0;
+			poll(&pollinf, 1, 100);
+			if (g_stop)
+				goto out;
 			numRead = TEMP_FAILURE_RETRY(read(nfd, buf,
-			    sizeof(buf)));
+						sizeof(buf)));
 		} while (numRead < 0);
 
 		PFSD_ASSERT(numRead >= 0);
@@ -534,6 +542,7 @@ chnl_listen_shm_thread_entry(void *arg)
 			p += sizeof(struct inotify_event) + event->len;
 		}
 	}
+out:
 	//Fixme: using op->chnl_ctx_destroy(ctx) instead? test needed
 	free(ctx);
 #endif
