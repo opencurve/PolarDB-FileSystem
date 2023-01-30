@@ -632,7 +632,7 @@ again:
 		return;
 	rc = recv(fd, buf, sizeof(buf), MSG_DONTWAIT);
 	if (rc == -1 && errno != EAGAIN) {
-		pfsd_warn("recv error %d", errno);
+		PFSD_CLIENT_LOG("recv error %d", errno);
 		return;
 	}
 	if (rc == -1)
