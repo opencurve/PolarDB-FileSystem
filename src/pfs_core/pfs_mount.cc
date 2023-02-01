@@ -69,6 +69,7 @@ typedef struct mountentry {
 } mountentry_t;
 
 static mountentry_t		mount_entry[PFS_MAX_NMOUNT];
+static pthread_once_t once_load_config = PTHREAD_ONCE_INIT;
 
 static void __attribute__((constructor))
 init_pfs_mountentry()
@@ -623,9 +624,24 @@ pfs_destroy_mount(pfs_mount_t *mnt)
 	pfs_mem_free(mnt, M_MOUNT);
 }
 
+static void
+try_load_pfs_config()
+{
+	char *env = getenv("PFS_DISABLE_LOAD_CONFIG");
+	if (env) {
+		pfs_itrace("PFS_DISABLE_LOAD_CONFIG is set, skip loading pfs config file: %s", DEFAULT_CONFIG_PATH);
+		return;
+	}
+
+	/* init pfs config from default path */
+	if (pfs_option_init(NULL) != CONFIG_OK)
+		pfs_etrace("pfs init option config failed");
+}
+
 int
 pfs_mount(const char *cluster, const char *pbdname, int host_id, int flags)
 {
+
 	mountentry_t *me;
 	int err = 0;
 	int fd = -1;
@@ -649,9 +665,8 @@ pfs_mount(const char *cluster, const char *pbdname, int host_id, int flags)
 	    pbdname, host_id, flags);
 
 	/* init pfs config from default path */
-	if (pfs_option_init(NULL) != CONFIG_OK)
-		pfs_etrace("pfs init option config failed, use default value PBD(%s), hostid(%d), flags(0x%x)\n",
-		    pbdname, host_id, flags);
+	pthread_once(&once_load_config, try_load_pfs_config);
+
 remount:
 	/* ensure the pbd is nonexistent */
 	me = mountentry_find_iter(mountentry_hasname, pbdname, RW_NOLOCK);
