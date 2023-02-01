@@ -54,6 +54,6 @@ bool	pfs_check_ival_switch(void *data);
 
 int	pfs_option_handle(int sock, msg_header_t *mh, msg_option_t *msgopt);
 
-int	pfs_option_init(const char *config_path);
+#include "pfs_option_api.h"
 
 #endif

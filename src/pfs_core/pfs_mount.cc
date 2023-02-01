@@ -42,7 +42,7 @@
 #include "pfs_config.h"
 
 extern "C" {
-    unsigned int __attribute__((weak)) server_id = 1984;
+    unsigned int __attribute__((weak)) pfs_server_id = 1984;
 }
 
 enum rwlock_action {
@@ -678,7 +678,7 @@ remount:
 	if (err < 0)
 		goto finish_mount;
 
-	pfs_trace_ctx_init(server_id, pfsdev_trace_pbdname(cluster, pbdname));
+	pfs_trace_ctx_init(pfs_server_id, pfsdev_trace_pbdname(cluster, pbdname));
 	if ((flags & MNTFLG_TOOL) == 0)
 		pfs_mntstat_start(mnt);
 

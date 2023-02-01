@@ -24,7 +24,7 @@
 #include "pfsd_shm.h"
 
 #ifdef PFSD_SERVER
-#include "pfsd_zlog.h"
+#include "pfsd_log.h"
 #include "pfsd_chnl.h"
 #endif
 
@@ -259,21 +259,21 @@ pfsd_shm_attach(const char *dir, const char *pbdname, int wr_attach)
 		shmfd = open(path, (wr_attach ? O_RDWR : O_RDONLY) | O_CLOEXEC,
 		    0664);
 		if (shmfd < 0) {
-			fprintf(stderr,
+			pfsd_error(
 			    "[pfsd]shm_open %s failed with error %d\n",
 			    path, errno);
 			goto finish;
 		}
 
 		if (fstat(shmfd, &st) < 0) {
-			fprintf(stderr,
+			pfsd_error(
 			    "[pfsd]fstat shm failed with error %d\n", errno);
 			goto finish;
 		}
 
 		shmaddr[si] = mmap(NULL, st.st_size, mflag, MAP_SHARED, shmfd, 0);
 		if (shmaddr[si] == MAP_FAILED) {
-			fprintf(stderr, "[pfsd]mmap failed with error %d\n",
+			pfsd_error("[pfsd]mmap failed with error %d\n",
 			    errno);
 			goto finish;
 		}
@@ -296,7 +296,7 @@ finish:
 		}
 	}
 
-	fprintf(stderr, "[pfsd] %s failed\n", __FUNCTION__);
+	pfsd_error("[pfsd] %s failed\n", __FUNCTION__);
 	return -1;
 }
 

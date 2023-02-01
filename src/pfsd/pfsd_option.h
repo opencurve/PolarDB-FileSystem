@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021, Alibaba Group Holding Limited
+ * Copyright (c) 2023 Netease inc.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,33 +16,34 @@
 #ifndef _PFSD_OPTION_H_
 #define _PFSD_OPTION_H_
 
-#include "pfs_impl.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-typedef struct {
-    int o_pollers;
+typedef struct pfsd_option {
+	int o_pollers;
 	/* Worker threads, same as num of channels */
 	int o_workers;
 	/* Worker thread usleep interval in us */
 	int o_usleep;
 	/* pbdname like 1-1 */
-	char o_pbdname[PFS_MAX_PBDLEN];
+	char o_pbdname[64];
 	/* shm directory */
-	char o_shm_dir[PFS_MAX_PATHLEN];
-	/* config file */
-	char o_log_cfg[PFS_MAX_PATHLEN];
+	char o_shm_dir[1024];
 	/* daemon mode */
 	int o_daemon;
-	/* if bind cpuset */
-	int o_affinity;
-    /* auto increase epoch when mount which write mode */
-    int o_auto_increase_epoch;
+	/* auto increase epoch when mount which write mode */
+	int o_auto_increase_epoch;
+	/* server id, for Postgresql? */
+	int o_server_id;
 } pfsd_option_t;
 
-extern pfsd_option_t g_option;
+void pfsd_option_init(struct pfsd_option *opt);
+void pfsd_option_fini(struct pfsd_option *opt);
 
-int pfsd_parse_option(int ac, char *av[]);
-void pfsd_usage(const char *prog);
-void pfsd_worker_usleep();
+extern pfsd_option_t g_pfsd_option;
 
+#ifdef __cplusplus
+}
 #endif
-
+#endif

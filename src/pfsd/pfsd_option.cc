@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021, Alibaba Group Holding Limited
+ * Copyright (c) 2023 Netease Inc
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,151 +13,36 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
+/* Author: Xu Yifeng */
 
 #include "pfsd_option.h"
 #include "pfsd_common.h"
-#include "pfs_option.h"
 
-unsigned int server_id = 0; /* db ins id */
+#include <string.h>
 
-pfsd_option_t g_option;
+pfsd_option_t g_pfsd_option;
 
-static int64_t worker_usleep_us = 10;
-PFS_OPTION_REG(worker_usleep_us, pfs_check_ival_normal);
-
-#define PFSD_TRIM_VALUE(v, min_v, max_v) do {\
-	if (v > max_v) \
-		v = max_v; \
-	else if (v < min_v) \
-		v = min_v; \
-} while(0)
-
-static bool
-sanity_check()
+extern "C"
+void pfsd_option_init(struct pfsd_option *opt)
 {
-	PFSD_TRIM_VALUE(g_option.o_workers, 1, PFSD_WORKER_MAX);
-	PFSD_TRIM_VALUE(g_option.o_usleep, 0, 1000);
-	worker_usleep_us = g_option.o_usleep;
+	bzero(opt, sizeof(*opt));
+	opt->o_pollers = 2;
+	opt->o_workers = 20;
+	opt->o_usleep = 1;
+	strncpy(opt->o_shm_dir, PFSD_SHM_PATH, sizeof g_pfsd_option.o_shm_dir);
+	opt->o_daemon = 0;
+	opt->o_server_id = 0;
+	opt->o_auto_increase_epoch = 0;
+}
 
-	if (strlen(g_option.o_pbdname) == 0) {
-		fprintf(stderr, "pbdname is empty\n");
-		return false;
-	}
-
-	fprintf(stderr, "option workers %d\n",g_option.o_workers);
-	fprintf(stderr, "option pbdname %s\n",g_option.o_pbdname);
-	fprintf(stderr, "option server id %u\n", server_id);
-	fprintf(stderr, "option logconf %s\n",g_option.o_log_cfg);
-
-    return true;
+extern "C"
+void pfsd_option_fini(struct pfsd_option *opt)
+{
+	/* nothing to do */
 }
 
 static void __attribute__((constructor))
 init_default_value()
 {
-    g_option.o_pollers = 2;
-	g_option.o_workers = 256;
-	g_option.o_usleep = int(worker_usleep_us);
-	strncpy(g_option.o_log_cfg, "pfsd_logger.conf", sizeof g_option.o_log_cfg);
-	strncpy(g_option.o_shm_dir, PFSD_SHM_PATH, sizeof g_option.o_shm_dir);
-	g_option.o_daemon = 1;
-	server_id = 0;
-    g_option.o_auto_increase_epoch = 0;
-}
-
-int
-pfsd_parse_option(int ac, char *av[])
-{
-	int ch = 0;
-	while ((ch = getopt(ac, av, "w:s:i:c:p:a:l:e:fd:r:q")) != -1) {
-		switch (ch) {
-			case 'f':
-				g_option.o_daemon = 0;
-				break;
-
-			case 'd':
-				g_option.o_daemon = 1;
-				break;
-			case 'w':
-				{
-					errno = 0;
-					long w = strtol(optarg, NULL, 10);
-					if (errno == 0)
-						g_option.o_workers = int(w);
-				}
-				break;
-			case 's':
-				{
-					errno = 0;
-					long us = strtol(optarg, NULL, 10);
-					if (errno == 0)
-						g_option.o_usleep = int(us);
-				}
-				break;
-			case 'i':
-				break;
-			case 'e':
-				{
-					errno = 0;
-					long w = strtol(optarg, NULL, 10);
-					if (errno == 0)
-						server_id = (unsigned int)(w);
-				}
-				break;
-			case 'c':
-				strncpy(g_option.o_log_cfg, optarg, sizeof g_option.o_log_cfg);
-				break;
-			case 'p':
-				strncpy(g_option.o_pbdname, optarg, sizeof g_option.o_pbdname);
-				break;
-			case 'a':
-				strncpy(g_option.o_shm_dir, optarg, sizeof g_option.o_shm_dir);
-				break;
-            case 'r':
-                {
-					errno = 0;
-					long w = strtol(optarg, NULL, 10);
-					if (errno == 0)
-						g_option.o_pollers = (unsigned int)(w);
-                }
-                break;
-            case 'q':
-                g_option.o_auto_increase_epoch = 1;
-                break;
-			default:
-				return -1;
-		}
-	}
-
-	if (!sanity_check())
-		return -1;
-
-	if (optind != ac)
-		return -1;
-
-	return 0;
-}
-
-void
-pfsd_usage(const char *prog)
-{
-	fprintf(stderr, "Usage: %s \n"
-					" -f (not daemon mode)\n"
-					" -w #nworkers\n"
-					" -c log_config_file\n"
-					" -p pbdname\n"
-					" -e db ins id\n"
-					" -a shm directory\n"
-					" -i #inode_list_size\n", prog);
-}
-
-void
-pfsd_worker_usleep()
-{
-	if (worker_usleep_us > 0)
-		usleep(worker_usleep_us);
+	pfsd_option_init(&g_pfsd_option);
 }

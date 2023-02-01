@@ -22,7 +22,8 @@ link_directories(
 )
 
 SET(SRC_LIST_PFSD pfsd_main.cc
-                  pfsd_api.cc
+                  pfsd.cc
+                  pfsd_svr.cc
                   pfsd_chnl.cc
                   pfsd_chnl_shm.cc
                   pfsd_common.cc

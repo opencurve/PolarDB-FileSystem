@@ -23,8 +23,8 @@
 #include "pfs_mount.h"
 #include "pfs_trace.h"
 #include "pfs_api.h"
-#include "pfsd_api.h"
-#include "pfsd_zlog.h"
+#include "pfsd_svr.h"
+#include "pfsd_log.h"
 #include "pfs_file.h"
 
 #include "pfs_file.cc"

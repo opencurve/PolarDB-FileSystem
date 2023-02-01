@@ -130,32 +130,81 @@ pfsd_sdk_pbdname(const char *pbdpath, char *pbdname)
 	return 0;
 }
 
-int
-pfsd_write_pid(const char *pbdname) {
-	char file[4*1024] = "";
-	snprintf(file, sizeof(file), "/var/run/pfsd/pfsd_%s.pid", pbdname);
-	int fd = ::open(file, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-	if (fd < 0)
-		return -errno;
+#define PATH_PFSD_RUN   "/var/run/pfsd"
+#define PATH_PFS_RUN    "/var/run/pfs"
+#define PATH_PFSD_SHM   "/dev/shm/pfsd"
 
-	if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
-		close(fd);
-		return -errno;
-	}
+static int
+pfsd_mkdir(const char *dir)
+{
+	int rc;
 
-	char buf[128];
-	size_t size = snprintf(buf, sizeof(buf), "%ld", (long)getpid());
-	int ret = write(fd, buf, size);
-	if (ret != (int)size) {
-		close(fd);
-		return -EIO;
+	rc = access(dir, R_OK|W_OK|X_OK);
+	if (rc == -1) {
+		if (errno == ENOENT) {
+			pfsd_info("directory %s does not exists, create it!", dir);
+			rc = mkdir(dir, 0777);
+			if (rc == -1) {
+				pfsd_error("can not make directory: %s", dir);
+				return -1;
+			}
+		} else if (errno) {
+			pfsd_error("can not access directory: %s, error:%s", dir,
+					strerror(errno));
+			return -1;
+		}
 	}
 
 	return 0;
 }
 
-const char mon_name[][4] = {
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-};
+int
+pfsd_prepare_env(void)
+{
+	return pfsd_mkdir(PATH_PFSD_RUN) || pfsd_mkdir(PATH_PFS_RUN) ||
+	       pfsd_mkdir(PATH_PFSD_SHM);
+}
+
+int
+pfsd_pidfile_open(const char *pbdname)
+{
+	int fd = -1;
+	char file[1024] = "";
+
+	snprintf(file, sizeof(file), "/var/run/pfsd/pfsd_%s.pid", pbdname);
+	fd = ::open(file, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+	if (fd < 0) {
+		pfsd_error("can not open/create file: %s, error: %s", file,
+			   strerror(errno));
+		return -errno;
+	}
+
+	if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
+		pfsd_error("can not lock file: %s, error: %s", file,
+			   strerror(errno));
+
+		close(fd);
+		return -errno;
+	}
+
+	return fd;
+}
+
+int
+pfsd_pidfile_write(int fd)
+{
+	char buf[128];
+	size_t size = snprintf(buf, sizeof(buf), "%ld", (long)getpid());
+	int ret = write(fd, buf, size);
+	if (ret != (int)size) {
+		return -EIO;
+	}
+	return 0;
+}
+
+int
+pfsd_pidfile_close(int fd) 
+{
+	return close(fd);
+}
 

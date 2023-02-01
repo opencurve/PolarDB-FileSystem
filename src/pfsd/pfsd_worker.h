@@ -22,7 +22,7 @@
 
 struct pfsd_iochannel;
 
-extern volatile bool g_stop;
+extern volatile bool g_pfsd_stop;
 
 typedef void (*worker_wait_io_t)(struct worker *);
 
@@ -40,7 +40,7 @@ typedef struct worker {
 	worker_wait_io_t w_wait_io;
 } worker_t;
 
-extern worker_t *g_worker;
+extern worker_t *g_pfsd_worker;
 
 worker_t *pfsd_create_workers(int nworkers);
 void pfsd_destroy_workers(worker_t **workers);

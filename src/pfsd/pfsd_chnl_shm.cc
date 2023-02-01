@@ -38,7 +38,7 @@
 #include "pfsd_shm.h"
 #include "pfsd_common.h"
 #include "pfsd_worker.h"
-#include "pfsd_zlog.h"
+#include "pfsd_log.h"
 
 #ifdef PFSD_SERVER
 #include "pfs_mount.h"
@@ -188,7 +188,7 @@ chnl_accept_shm_sync(chnl_ctx_shm_t *ctx, pfsd_chnl_op_t *op,
 	}
 
 #ifdef PFSD_SERVER
-	if (g_option.o_auto_increase_epoch == 1) {
+	if (g_pfsd_option.o_auto_increase_epoch == 1) {
 		file_data.sync_data.flags |= MNTFLG_AUTO_INCREASE_EPOCH;
 	}
 #endif
@@ -395,7 +395,7 @@ chnl_connect_socket(chnl_ctx_shm_t *ctx)
 	memset(&sockaddr, 0, sizeof(struct sockaddr_un));
 	sock = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 	if (sock == -1) {
-		PFSD_C_ELOG("socket() error: %d", errno);
+		pfsd_error("socket() error: %d", errno);
 		return -1;
 	}
 
@@ -421,20 +421,20 @@ chnl_connect_socket(chnl_ctx_shm_t *ctx)
 #else
 	rc = connect(sock, (struct sockaddr *)(void *)&sockaddr, len);
 	if (rc == -1) {
-		PFSD_CLIENT_LOG("connect() error: %d", errno);
+		pfsd_error("connect() error: %d", errno);
 		close(sock);
 		return -1;
 	}
-	PFSD_CLIENT_LOG("opened io-notify socket fd: %d", sock);
+	pfsd_info("opened io-notify socket fd: %d", sock);
 #endif
 	flags = fcntl(sock, F_GETFL, 0);
 	if (flags == -1) {
-		PFSD_C_ELOG("fcntl(F_GETFL) error: %d", errno);
+		pfsd_error("fcntl(F_GETFL) error: %d", errno);
 		close(sock);
 		return -1;
 	}
 	if (fcntl(sock, F_SETFL, flags | O_NONBLOCK)){
-		PFSD_C_ELOG("fcntl(F_SETFL) error: %d", errno);
+		pfsd_error("fcntl(F_SETFL) error: %d", errno);
 		close(sock);
 		return -1;
 	}
@@ -457,10 +457,10 @@ pfsd_shm_reconnect_socket(chnl_ctx_shm_t *ctx, int gen)
 
 	for (;;) {
 		if (chnl_connect_socket(ctx)) {
-			PFSD_CLIENT_LOG("reconnect io-notify socket failed, retrying");
+			pfsd_info("reconnect io-notify socket failed, retrying");
 			sleep(1);
 		} else {
-			PFSD_CLIENT_LOG("reconnect io-notify socket success");
+			pfsd_info("reconnect io-notify socket success");
 			break;
 		}
 	}
@@ -491,13 +491,13 @@ chnl_listen_shm_thread_entry(void *arg)
 	int nfd = ctx->svr.shm_inotify_fd;
 	struct pollfd pollinf;
 
-	while (!g_stop) {
+	while (!g_pfsd_stop) {
 		do {
 			pollinf.fd = nfd;
 			pollinf.events = POLLIN;
 			pollinf.revents = 0;
 			poll(&pollinf, 1, 100);
-			if (g_stop)
+			if (g_pfsd_stop)
 				goto out;
 			numRead = TEMP_FAILURE_RETRY(read(nfd, buf,
 						sizeof(buf)));
@@ -641,7 +641,7 @@ again:
 		return;
 	rc = recv(fd, buf, sizeof(buf), MSG_DONTWAIT);
 	if (rc == -1 && errno != EAGAIN) {
-		PFSD_CLIENT_LOG("recv error %d", errno);
+		pfsd_info("recv error %d", errno);
 		return;
 	}
 	if (rc == -1)
@@ -671,7 +671,7 @@ chnl_prepare_shm(void *ctx_ptr, const char *pbdname, int nworkers, void *arg1)
 	int r = pthread_create(&worker->w_tid, NULL, pfsd_worker_routine, worker);
 	PFSD_ASSERT(r == 0);
 
-	g_worker = worker;
+	g_pfsd_worker = worker;
 #endif
 	return 0;
 }
@@ -1058,12 +1058,12 @@ chnl_ctx_create_shm(const char *svr_addr, bool is_svr)
 	/* Check if svr_addr is a directory */
 	err = stat(svr_addr, &dir_info);
 	if (err != 0) {
-		fprintf(stderr, "stat %s fail: %s\n", svr_addr, strerror(errno));
+		pfsd_error("stat %s fail: %s\n", svr_addr, strerror(errno));
 		return NULL;
 	}
 
 	if (!S_ISDIR(dir_info.st_mode)) {
-		fprintf(stderr, "%s is not dir\n", svr_addr);
+		pfsd_error("%s is not dir\n", svr_addr);
 		errno = ENOTDIR;
 		return NULL;
 	}
@@ -1207,7 +1207,7 @@ chnl_connection_sync_shm(chnl_ctx_shm_t *ctx, const char *cluster,
 
 	result = flock(ctx->ctx_pidfile_fd, LOCK_EX | LOCK_NB);
 	if (result < 0) {
-		PFSD_CLIENT_ELOG("client flock failed %s", strerror(errno));
+		pfsd_error("client flock failed %s", strerror(errno));
 		return result;
 	}
 
@@ -1232,14 +1232,14 @@ chnl_connection_sync_shm(chnl_ctx_shm_t *ctx, const char *cluster,
 	    sizeof(file_data->sync_data),
 	    offsetof(pidfile_data_t, sync_data)));
 	if (result != sizeof(file_data->sync_data)) {
-		PFSD_CLIENT_ELOG("client pwrite failed %s", strerror(errno));
+		pfsd_error("client pwrite failed %s", strerror(errno));
 		result = -1;
 		goto out;
 	}
 
 	/* inotify server by IN_ATTRIB */
 	if (fchmod(ctx->ctx_pidfile_fd, PIDFILE_MODE_MOUNT_REQ) != 0) {
-		PFSD_CLIENT_ELOG("client fchmod failed: %s", strerror(errno));
+		pfsd_error("client fchmod failed: %s", strerror(errno));
 		result = -1;
 		goto out;
 	}
@@ -1273,21 +1273,21 @@ chnl_getshm(chnl_ctx_shm_t *ctx)
 
 		len = strnlen(file_data->ack_data.v1.shm_fname[i], FILE_MAX_FNAME);
 		if (len == FILE_MAX_FNAME || len == 0) {
-			PFSD_CLIENT_ELOG("wrong shm filename len %lu", len);
+			pfsd_error("wrong shm filename len %lu", len);
 			errno = EPROTO;
 			return -1;
 		}
 		fd = open(file_data->ack_data.v1.shm_fname[i],
 		    O_RDWR | O_CLOEXEC, 0664);
 		if (fd < 0) {
-			PFSD_CLIENT_ELOG("shm_open [%s] with err %d",
+			pfsd_error("shm_open [%s] with err %d",
 			    file_data->ack_data.v1.shm_fname[i], errno);
 			return -1;
 		}
 
 		result = fstat(fd, &st);
 		if (result < 0 || st.st_size == 0) {
-			PFSD_CLIENT_ELOG("shm [%s] stat failed",
+			pfsd_error("shm [%s] stat failed",
 			    file_data->ack_data.v1.shm_fname[i]);
 			close(fd);
 			return -1;
@@ -1296,7 +1296,7 @@ chnl_getshm(chnl_ctx_shm_t *ctx)
 		ctx->clt.shm_ptr[i] = (char *)mmap(NULL, st.st_size,
 		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		if (ctx->clt.shm_ptr[i] == MAP_FAILED) {
-			PFSD_CLIENT_ELOG("shm %s mmap failed %d",
+			pfsd_error("shm %s mmap failed %d",
 			    file_data->ack_data.v1.shm_fname[i], errno);
 			ctx->clt.shm_ptr[i] = NULL;
 			close(fd);
@@ -1308,7 +1308,7 @@ chnl_getshm(chnl_ctx_shm_t *ctx)
 
 		int magic = ((pfsd_shm_t *)ctx->clt.shm_ptr[i])->sh_magic;
 		if (magic != PFSD_SHM_MAGIC) {
-			PFSD_CLIENT_ELOG("wrong shm magic %u, expect %u",
+			pfsd_error("wrong shm magic %u, expect %u",
 			    magic, PFSD_SHM_MAGIC);
 			return -1;
 		}
@@ -1345,7 +1345,7 @@ chnl_connection_release_shm(chnl_ctx_shm_t *chnl_ctx, bool forced, bool wait)
 		if (forced) {
 			/* inotify server by IN_ATTRIB */
 			if (fchmod(ctx->ctx_pidfile_fd, PIDFILE_MODE_UMOUNT_REQ) != 0) {
-				PFSD_CLIENT_ELOG("client fchmod failed: %s", strerror(errno));
+				pfsd_error("client fchmod failed: %s", strerror(errno));
 				result = -1;
 			}
 		}
@@ -1359,7 +1359,7 @@ chnl_connection_release_shm(chnl_ctx_shm_t *chnl_ctx, bool forced, bool wait)
 		while (!done) {
 			if (access(ctx->ctx_pidfile_addr, F_OK) < 0 && errno == ENOENT) {
 				done = 1;
-				PFSD_CLIENT_LOG(
+				pfsd_error(
 				    "client umount return : deleted %s",
 				    ctx->ctx_pidfile_addr);
 				break;
@@ -1418,7 +1418,7 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_u
 	while (wait) {
 		result = fstat(ctx->ctx_pidfile_fd, &st);
 		if (result < 0) {
-			PFSD_CLIENT_ELOG("fstat error %s", strerror(errno));
+			pfsd_error("fstat error %s", strerror(errno));
 			break;
 		}
 
@@ -1429,7 +1429,7 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_u
 			    offsetof(pidfile_data_t, ack_data)));
 
 			if (result != sizeof(file_data->ack_data)) {
-				PFSD_CLIENT_ELOG("ack data is not complete, "
+				pfsd_error("ack data is not complete, "
 				    "it's impossible because pwrite is atomic");
 				errno = EAGAIN;
 				result = -1;
@@ -1440,13 +1440,13 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_u
 				    pfs_mount_epoch) {
 					pfs_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
 					mount_epoch_set(pbdname, pfs_mount_epoch);
-					PFSD_CLIENT_LOG(
+					pfsd_info(
 					    "ack data update s_mount_epoch %d",
 					    pfs_mount_epoch);
 					wait = false;
 				} else {
 					if (i++ % 10000 == 0) {
-						PFSD_CLIENT_LOG(
+						pfsd_info(
 						    "waiting... file.epoch %d, s_mount_epoch %d",
 						    file_data->ack_data.v1.shm_mnt_epoch,
 						    pfs_mount_epoch);
@@ -1468,7 +1468,7 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_u
 	}
 
 	if (result >= 0) {
-		PFSD_CLIENT_LOG(
+		pfsd_info(
 		    "connect and got ack data from svr, err = %d, mntid %d",
 		    file_data->ack_data.err,
 		    file_data->ack_data.v1.mntid);
@@ -1481,9 +1481,9 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_u
 			if (result == 0)
 				conn_id = file_data->ack_data.v1.shm_connect_id;
 			else {
-				PFSD_CLIENT_LOG("remount error! %d", errno);
+				pfsd_error("remount error! %d", errno);
 				if (file_data->ack_data.v1.mntid < 0) {
-					PFSD_CLIENT_LOG("unrecovered error!");
+					pfsd_error("unrecovered error!");
 					exit(-1);
 				}
 			}
@@ -1498,7 +1498,7 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_u
 	}
 
 	if (result < 0) {
-		PFSD_CLIENT_ELOG("Connect failed err %d : %s", result,
+		pfsd_error("Connect failed err %d : %s", result,
 		    strerror(errno));
 		if (!reconn)
 			chnl_connection_release_shm(ctx, false, false);
@@ -1526,7 +1526,7 @@ chnl_connect_shm(void *chnl_ctx, const char *cluster, const char *pbdname,
 		result = chnl_connection_open_shm(ctx);
 		if (result < 0) {
 			if (errno != EEXIST) {
-				PFSD_CLIENT_ELOG("Failed create pidfile: %s",
+				pfsd_error("Failed create pidfile: %s",
 				    strerror(errno));
 				goto fini;
 			}
@@ -1539,7 +1539,7 @@ chnl_connect_shm(void *chnl_ctx, const char *cluster, const char *pbdname,
 
 	result = chnl_connection_sync_shm(ctx, cluster, pbdname, host_id, flags);
 	if (result < 0) {
-		PFSD_CLIENT_ELOG("Failed sync shm: %s", strerror(errno));
+		pfsd_error("Failed sync shm: %s", strerror(errno));
 		goto fini;
 	}
 
@@ -1549,7 +1549,7 @@ chnl_connect_shm(void *chnl_ctx, const char *cluster, const char *pbdname,
 	if (conn_id != -1) {
 		if (chnl_connect_socket(ctx)) {
 			chnl_connection_release_shm(ctx, true, false);
-			PFSD_CLIENT_ELOG("can not connect socket %s", ctx->ctx_io_sock_addr);
+			pfsd_error("can not connect socket %s", ctx->ctx_io_sock_addr);
 			return  -1;
 		}
 	}
@@ -1664,7 +1664,7 @@ chnl_alloc_shm(void *chnl_ctx, int64_t max_req_len, void **req_buffer,
 	int req_index = -1;
 	if (pfsd_sdk_alloc_request(ctx->clt.shm_connect_id, iosize,
 	    (pfsd_shm_t **)ctx->clt.shm_ptr, PFSD_SHM_MAX, &ch, &req) != 0) {
-		PFSD_CLIENT_ELOG("Alloc request failed");
+		pfsd_error("Alloc request failed");
 		return -1;
 	}
 

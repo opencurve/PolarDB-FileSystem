@@ -30,6 +30,7 @@ SET(SRC_LIST_PFSD_SDK ../pfsd/pfsd_common.cc
                       pfsd_sdk_file.cc
                       pfsd_sdk_mount.cc
                       pfsd_sdk.cc
+                      pfsd_sdk_log.cc
     )
 # objects
 add_library(tmp_object_lib OBJECT ${SRC_LIST_PFSD_SDK})

@@ -63,7 +63,7 @@ pfsd_connect_add_data(int32_t connect_id, void *data, pfsd_chnl_op *op)
 	pthread_rwlock_unlock(&pfsd_connect_lock);
 
 	if (result == NULL) {
-               PFSD_CLIENT_ELOG(
+               pfsd_error(
                    "can not add connection id : %d, table full", connect_id);
         }
 
@@ -154,7 +154,7 @@ pfsd_chnl_connect(const char *svr_addr, const char *cluster, int timeout_ms,
 
 	if (!svr_addr || !pbdname ||
 	    host_id < 0 || flags == 0) {
-		PFSD_CLIENT_ELOG(
+		pfsd_error(
 		    "wrong args svr_addr(%p) pbdname(%p) host_id(%d) flags(%d)",
 		    svr_addr, pbdname, host_id, flags);
 
@@ -166,7 +166,7 @@ pfsd_chnl_connect(const char *svr_addr, const char *cluster, int timeout_ms,
 	snprintf(full_svr_addr, PFSD_MAX_SVR_ADDR_SIZE, "%s/%s", svr_addr, pbdname);
 	svr_addr = full_svr_addr;
 	if (mkdir(svr_addr, 0777) != 0 && errno != EEXIST) {
-		PFSD_CLIENT_ELOG("mkdir %s failed %s", svr_addr, strerror(errno));
+		pfsd_error("mkdir %s failed %s", svr_addr, strerror(errno));
 		return -1;
 	}
 	chmod(svr_addr, 0777);
@@ -191,7 +191,7 @@ pfsd_chnl_connect(const char *svr_addr, const char *cluster, int timeout_ms,
 		op->chnl_ctx_destroy(ctx);
 		return -1;
 	}
-	PFSD_CLIENT_ELOG("server conn id: %d, mapped to %d", saved_id, conn_id);
+	pfsd_error("server conn id: %d, mapped to %d", saved_id, conn_id);
 
 	return conn_id;
 }
@@ -206,7 +206,7 @@ pfsd_chnl_reconnect(int32_t conn_id, const char *cluster, int timeout_ms,
 	int ret;
 
 	if (!pbdname || host_id < 0 || flags == 0) {
-		PFSD_CLIENT_ELOG("wrong args pbdname(%s) host_id(%d) flags(%d)",
+		pfsd_error("wrong args pbdname(%s) host_id(%d) flags(%d)",
 		    pbdname, host_id, flags);
 		errno = EINVAL;
 		return -1;
@@ -364,7 +364,7 @@ pfsd_chnl_listen(const char *svr_addr, const char *pbdname, int nworkers,
 	pfsd_chnl_op *opt = NULL;
 
 	if (!svr_addr || !pbdname || nworkers <= 0) {
-		fprintf(stderr,
+		pfsd_error(
 		    "wrong args svr_addr(%p) pbdname(%p) nworkers(%d)\n",
 		    svr_addr, pbdname, nworkers);
 
@@ -377,7 +377,7 @@ pfsd_chnl_listen(const char *svr_addr, const char *pbdname, int nworkers,
 	    pbdname);
 	svr_addr = full_svr_addr;
 	if (mkdir(svr_addr, 0777) != 0 && errno != EEXIST) {
-		fprintf(stderr, "mkdir %s failed %s\n", svr_addr,
+		pfsd_error("mkdir %s failed %s\n", svr_addr,
 		    strerror(errno));
 		return -1;
 	}
@@ -391,21 +391,21 @@ pfsd_chnl_listen(const char *svr_addr, const char *pbdname, int nworkers,
 
 	result = opt->chnl_prepare(ctx, pbdname, nworkers, arg2);
 	if (result != 0) {
-		fprintf(stderr, "chnl_prepare failed %s\n", strerror(errno));
+		pfsd_error("chnl_prepare failed %s\n", strerror(errno));
 		opt->chnl_ctx_destroy(ctx);
 		return result;
 	}
 
 	result = opt->chnl_listen(ctx, opt, svr_addr, arg1, arg2);
 	if (result < 0) {
-		fprintf(stderr, "chnl_listen failed %s\n", strerror(errno));
+		pfsd_error("chnl_listen failed %s\n", strerror(errno));
 		opt->chnl_ctx_destroy(ctx);
 		return result;
 	}
 
 	result = opt->chnl_recover(ctx, opt, svr_addr, nworkers, NULL);
 	if (result != 0) {
-		fprintf(stderr, "chnl_recover failed %s\n", strerror(errno));
+		pfsd_error("chnl_recover failed %s\n", strerror(errno));
 		opt->chnl_ctx_destroy(ctx);
 		return result;
 	}
@@ -439,7 +439,7 @@ pfsd_chnl_accept_begin(void *ctx, void *op, int32_t conn_id_hint)
 		break;
 	}
 	if (conn_id < 0) {
-		fprintf(stderr, "failed to alloc conn id, hint %d\n",
+		pfsd_error("failed to alloc conn id, hint %d\n",
 		    conn_id_hint);
 	}
 	return conn_id;
@@ -527,7 +527,7 @@ bool pfsd_is_valid_connid(int32_t cid)
 {
 	bool ok = cid > 0 && cid < CHNL_MAX_CONN;
 	if (!ok && cid != -1)
-		fprintf(stderr, "Wrong conn id %d\n", cid);
+		pfsd_error("Wrong conn id %d\n", cid);
 	return ok;
 }
 
