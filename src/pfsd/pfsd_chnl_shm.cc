@@ -375,10 +375,10 @@ chnl_close_shm_svr(chnl_ctx_shm_t *ctx, const char *filename, uint32_t name_len,
 
 out_unlink:
 	if (unlink(filename) != 0) {
-		pfsd_error("unlink %s fail because %s", filename,
+		pfsd_error("unlink client file %s fail because %s", filename,
 		    strerror(errno));
 	} else {
-		pfsd_info("unlink %s success", filename);
+		pfsd_info("unlink client file %s success", filename);
 	}
 out:
 	close(fd);
