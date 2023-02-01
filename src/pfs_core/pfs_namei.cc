@@ -249,8 +249,16 @@ pfs_namei_init(nameinfo_t *ni, const char *path, int type)
 	while (*nmstart == '/')
 		nmstart++;
 	nmend = strchr(nmstart, '/');
-	if (nmend == NULL)
-		ERR_RETVAL(EINVAL);
+	if (nmend == NULL) {
+		if (*nmstart == '\0')
+			ERR_RETVAL(EINVAL);
+		if (n >= len -1)
+			ERR_RETVAL(ENAMETOOLONG);
+		ni->ni_buf[n] = '/';
+		ni->ni_buf[n+1] = '\0';
+		nmend = &ni->ni_buf[n];
+		n++;
+	}
 	len = nmend - nmstart;
 	PFS_ASSERT(len > 0);
 	PFS_ASSERT(*nmend == '/');
