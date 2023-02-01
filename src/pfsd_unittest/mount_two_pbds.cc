@@ -20,8 +20,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "pfsd_sdk.h"
-#include "pfsd_shm.h"
+#include "pfsd_cli.h"
 
 #define READ_SIZE (1 * 1024)
 

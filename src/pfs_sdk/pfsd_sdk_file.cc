@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 #include "pfsd_common.h"
-#include "pfsd_sdk.h"
+#include "pfsd_cli.h"
 #include "pfsd_sdk_file.h"
 #include "pfsd_sdk_mount.h"
 

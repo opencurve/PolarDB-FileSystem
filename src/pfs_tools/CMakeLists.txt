@@ -64,14 +64,14 @@ target_link_libraries(pfs-tools
     -Wl,--start-group
     -Wl,--no-as-needed
     pfs
-    pfsd
+    pfsd_cli
     -Wl,--end-group
    pthread
 )
 
 add_dependencies(pfs-tools
     pfs
-    pfsd
+    pfsd_cli
 )
 
 configure_file(${PROJECT_SOURCE_DIR}/src/pfs_tools/pfsadm

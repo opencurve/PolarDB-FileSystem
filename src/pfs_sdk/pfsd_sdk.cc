@@ -27,7 +27,7 @@
 #include "pfsd_proto.h"
 #include "pfsd_shm.h"
 #include "pfsd_sdk_file.h"
-#include "pfsd_sdk.h"
+#include "pfsd_cli.h"
 #include "pfsd_sdk_mount.h"
 
 #include "pfsd_chnl.h"

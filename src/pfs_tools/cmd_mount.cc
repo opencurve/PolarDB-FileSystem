@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "pfsd_sdk.h"
+#include "pfsd_cli.h"
 #include "pfs_mount.h"
 #include "cmd_impl.h"
 

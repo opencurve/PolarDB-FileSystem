@@ -24,8 +24,8 @@ include(CheckIncludeFile)
 message("compile pfsd for PostgreSQL")
 
 set(PKG_DIR "/usr/local/polarstore/pfsd")
-set(CMAKE_BUILD_TYPE "Release")
-#set(CMAKE_BUILD_TYPE "Debug")
+#set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Debug")
 
 include(CMakeLists-config.txt)
 
@@ -119,7 +119,7 @@ message(STATUS "CXX_FLAGS = " ${CMAKE_CXX_FLAGS} " " ${CMAKE_CXX_FLAGS_${BUILD_T
 message(STATUS "C_FLAGS = " ${CMAKE_C_FLAGS} " " ${CMAKE_C_FLAGS_${BUILD_TYPE}})
 
 execute_process(COMMAND mkdir -p ${PROJECT_SOURCE_DIR}/include)
-execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/src/pfs_sdk/pfsd_sdk.h ${PROJECT_SOURCE_DIR}/include/)
+execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/src/pfs_sdk/pfsd_cli.h ${PROJECT_SOURCE_DIR}/include/)
 
 add_subdirectory(src)
 
@@ -138,8 +138,12 @@ set(CPACK_GENERATOR "RPM;DEB")
 #don't detect nebd library
 set(CPACK_RPM_PACKAGE_AUTOREQ FALSE)
 file(GLOB pfsd_HEADERS
-     ${PROJECT_SOURCE_DIR}/src/pfs_sdk/pfsd_sdk.h
+     ${PROJECT_SOURCE_DIR}/src/pfs_core/pfs_api.h
      ${PROJECT_SOURCE_DIR}/src/pfs_core/pfs_trace_func.h
+     ${PROJECT_SOURCE_DIR}/src/pfs_core/pfs_option_api.h
+     ${PROJECT_SOURCE_DIR}/src/pfsd/pfsd_api.h
+     ${PROJECT_SOURCE_DIR}/src/pfsd/pfsd_option.h
+     ${PROJECT_SOURCE_DIR}/src/pfs_sdk/pfsd_cli.h
 )
 
 file(GLOB deploy_FILES

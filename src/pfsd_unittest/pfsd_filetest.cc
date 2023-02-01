@@ -25,7 +25,7 @@ using std::endl;
 using std::string;
 
 #include "pfsd_testenv.h"
-#include "pfsd_sdk.h"
+#include "pfsd_cli.h"
 
 #define OFF_MAX ~((off_t)1 << (sizeof(off_t) * 8 - 1))
 #define OFF_MIN  ((off_t)1 << (sizeof(off_t) * 8 - 1))

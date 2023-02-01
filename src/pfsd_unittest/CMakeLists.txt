@@ -54,7 +54,7 @@ target_link_libraries(pfsd_unittest
 
 add_dependencies(pfs-tools
     pfs
-    pfsd
+    pfsd_cli
 )
 
 add_executable(
@@ -67,7 +67,7 @@ target_link_libraries(sdk_demo
     -Wl,--start-group
     -Wl,--no-as-needed
     pfs
-    pfsd
+    pfsd_cli
     pthread
     -Wl,--end-group
 )
@@ -81,7 +81,7 @@ target_link_libraries(mount_two_pbds
     -Wl,--start-group
     -Wl,--no-as-needed
     pfs
-    pfsd
+    pfsd_cli
     pthread
     -Wl,--end-group
 )

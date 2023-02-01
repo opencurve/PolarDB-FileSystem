@@ -14,7 +14,7 @@
  */
 
 #include "pfsd_testenv.h"
-#include "pfsd_sdk.h"
+#include "pfsd_cli.h"
 #include "pfs_mount.h"
 #include "pfsd_common.h"
 #include <iostream>
