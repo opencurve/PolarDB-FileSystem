@@ -38,7 +38,6 @@
 static zlog_category_t *original_zlog_cat = NULL;
 static int zlog_inited;
 static char o_zlog_cfg[1024];
-static char o_pfs_cfg[1024];
 
 /* Ctrl+C handler */
 static void
@@ -192,12 +191,6 @@ pfsd_parse_option(int ac, char *av[], pfsd_option_t *opt)
 		case 'c':
 			if (!safe_strncpy(o_zlog_cfg, optarg, sizeof o_zlog_cfg,
 					"log cfg file name")) {
-				return -1;
-			}
-			break;
-		case 'C':
-			if (!safe_strncpy(o_pfs_cfg, optarg, sizeof o_pfs_cfg,
-					"pfs core cfg file name")) {
 				return -1;
 			}
 			break;
