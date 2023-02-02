@@ -47,7 +47,7 @@ target_link_libraries(pfsd_unittest
     -Wl,--start-group
     -Wl,--no-as-needed
     pfs
-    pfsd
+    pfsd_cli
     pthread
     -Wl,--end-group
 )
