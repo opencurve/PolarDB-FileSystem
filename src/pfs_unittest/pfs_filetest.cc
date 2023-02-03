@@ -61,6 +61,7 @@ public:
     void TearDown() override {
         pfs_close(fd_);
         int r = pfs_unlink(pbdpath_.data());
+	r = r;
         assert(r == 0);
     }
 
