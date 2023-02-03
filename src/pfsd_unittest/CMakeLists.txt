@@ -12,22 +12,16 @@
 # limitations under the License.
 
 include_directories(
-    ${PROJECT_SOURCE_DIR}/src/pfs_tools
-    ${PROJECT_SOURCE_DIR}/src/pfs_core/
-	${PROJECT_SOURCE_DIR}/src/pfsd/
-	${PROJECT_SOURCE_DIR}/src/pfs_sdk/
-    ${PROJECT_SOURCE_DIR}/src/trace/include/
+    ${CMAKE_SOURCE_DIR}/src/pfs_tools
+    ${CMAKE_SOURCE_DIR}/src/pfsd/
+    ${CMAKE_SOURCE_DIR}/src/pfs_sdk/
+    ${CMAKE_SOURCE_DIR}/src/trace/include/
 )
 
-link_directories(
-    ${LIBRARY_OUTPUT_PATH}
-)
-
-add_executable(
-	pfsd_unittest
-	pfsd_unittest.cc
-	pfsd_filetest.cc
-	pfsd_testenv.cc
+add_executable(pfsd_unittest
+    pfsd_unittest.cc
+    pfsd_filetest.cc
+    pfsd_testenv.cc
 )
 
 add_definitions(-D__STDC_FORMAT_MACROS)
@@ -38,53 +32,29 @@ set(CXXFLAGS
     -O0
 )
 
-if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-    set(CXXFLAGS ${CXXFLAGS}  -march=native)
-endif()
-
 target_link_libraries(pfsd_unittest
     gtest
-    -Wl,--start-group
-    -Wl,--no-as-needed
-    pfs
     pfsd_cli
     pthread
-    -Wl,--end-group
-)
-
-add_dependencies(pfs-tools
-    pfs
-    pfsd_cli
 )
 
 add_executable(
-	sdk_demo
-	sdk_demo.cc
+    sdk_demo
+    sdk_demo.cc
 )
 
 target_link_libraries(sdk_demo
     gtest
-    -Wl,--start-group
-    -Wl,--no-as-needed
-    pfs
     pfsd_cli
     pthread
-    -Wl,--end-group
 )
 
 add_executable(
-	mount_two_pbds
-	mount_two_pbds.cc
+    mount_two_pbds
+    mount_two_pbds.cc
 )
 target_link_libraries(mount_two_pbds
     gtest
-    -Wl,--start-group
-    -Wl,--no-as-needed
-    pfs
     pfsd_cli
     pthread
-    -Wl,--end-group
 )
-
-
-

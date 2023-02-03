@@ -1,3 +1,4 @@
+# Copyright (c) 2023, NetEase Inc.
 # Copyright (c) 2017-2021, Alibaba Group Holding Limited
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include_directories(
-    ${PROJECT_SOURCE_DIR}/src/pfs_core/
-    ${PROJECT_SOURCE_DIR}/src/pfs_core/lib/
-    ${PROJECT_SOURCE_DIR}/src/trace/include/
-    )
-
-set(SRC_LIST
+add_library(pfs SHARED
     devio_disk.cc
     devio_curve.cc
     pfs_admin.cc
@@ -50,25 +45,27 @@ set(SRC_LIST
     pfs_avl.cc
 )
 
-# lib pfs
-add_library(pfs STATIC
-    ${SRC_LIST}
-    ${SRC_LIST_LIB}
+target_include_directories(pfs
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
+      ${CMAKE_CURRENT_SOURCE_DIR}/lib
+      ${CMAKE_CURRENT_SOURCE_DIR}/../trace/include
 )
 
-if (HAVE_NEBD)
-target_compile_definitions(pfs PRIVATE HAVE_NEBD)
-endif()
+set_target_properties(pfs PROPERTIES
+    VERSION 2.1.5
+    SOVERSION 2
+)
 
-message("${CURVE_LIBS}")
+target_link_directories(pfs PRIVATE ${CURVE_LIB_DIR})
 
 target_link_libraries(pfs
-    ${CURVE_LIBS}
-    rt
-    pthread
-    dl
-    aio
+   PRIVATE
+      pthread
+      aio
+      rt
+      curve_sdk
 )
+target_link_options(pfs PRIVATE "-Wl,--no-as-needed")
 
-set_property(TARGET pfs PROPERTY POSITION_INDEPENDENT_CODE ON)
-
+install(TARGETS pfs LIBRARY DESTINATION "${PKG_DIR}/lib")

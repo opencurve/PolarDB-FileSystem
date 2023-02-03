@@ -12,15 +12,11 @@
 # limitations under the License.
 
 include_directories(
-    ${PROJECT_SOURCE_DIR}/src/pfs_tools
-    ${PROJECT_SOURCE_DIR}/src/pfs_core/
-	${PROJECT_SOURCE_DIR}/src/pfsd/
-	${PROJECT_SOURCE_DIR}/src/pfs_sdk/
+    ${CMAKE_SOURCE_DIR}/src/pfs_tools
+    ${CMAKE_SOURCE_DIR}/src/pfs_core/
+    ${CMAKE_SOURCE_DIR}/src/pfsd/
+    ${CMAKE_SOURCE_DIR}/src/pfs_sdk/
     ${PROJECT_SOURCE_DIR}/src/trace/include/
-)
-
-link_directories(
-    ${LIBRARY_OUTPUT_PATH}
 )
 
 add_executable(pfs-tools
@@ -44,7 +40,7 @@ add_executable(pfs-tools
 	cmd_rm.cc
 	cmd_usedinfo.cc
 )
-SET_TARGET_PROPERTIES(pfs-tools
+set_target_properties(pfs-tools
 	PROPERTIES OUTPUT_NAME pfs
 )
 
@@ -56,22 +52,10 @@ set(CXXFLAGS
     -O0
 )
 
-if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-    set(CXXFLAGS ${CXXFLAGS}  -march=native)
-endif()
-
 target_link_libraries(pfs-tools
-    -Wl,--start-group
-    -Wl,--no-as-needed
     pfs
     pfsd_cli
-    -Wl,--end-group
-   pthread
-)
-
-add_dependencies(pfs-tools
-    pfs
-    pfsd_cli
+    pthread
 )
 
 configure_file(${PROJECT_SOURCE_DIR}/src/pfs_tools/pfsadm

@@ -17,10 +17,6 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/trace/include/
 )
 
-link_directories(
-    ${LIBRARY_OUTPUT_PATH}
-)
-
 add_executable(
 	pfs_unittest
 	pfs_unittest.cc
@@ -36,25 +32,9 @@ set(CXXFLAGS
     -O0
 )
 
-if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-    set(CXXFLAGS ${CXXFLAGS}  -march=native)
-endif()
-
 target_link_libraries(pfs_unittest
-    -Wl,--disable-new-dtags                                                     
-    -Wl,--push-state                                                            
-    -Wl,--no-as-needed                                                          
-    -Wl,--whole-archive                                                         
-    -Bstatic                                                                    
     pfs
-    -Wl,--no-whole-archive                                                      
-    -Wl,--pop-state                                                             
     gtest
     gflags
     pthread
 )
-
-add_dependencies(pfs-tools
-    pfs
-)
-

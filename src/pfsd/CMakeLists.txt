@@ -1,3 +1,4 @@
+# Copyright (c) 2023, Netease Inc.
 # Copyright (c) 2017-2021, Alibaba Group Holding Limited
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,59 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include_directories(
-    ${PROJECT_SOURCE_DIR}/src/pfsd/
-    ${PROJECT_SOURCE_DIR}/src/pfs_core/
-    ${PROJECT_SOURCE_DIR}/src/trace/include/
+add_library(pfsd_server SHARED
+    pfsd.cc
+    pfsd_svr.cc
+    pfsd_chnl.cc
+    pfsd_chnl_shm.cc
+    pfsd_common.cc
+    pfsd_memory.cc
+    pfsd_option.cc
+    pfsd_shm.cc
+    pfsd_worker.cc
 )
 
-link_directories(
-    ${LIBRARY_OUTPUT_PATH}
-)
+# Set public definitions used by ourself and pfsdaemon
+target_compile_definitions(pfsd_server PUBLIC PFSD_SERVER)
 
-SET(SRC_LIST_PFSD pfsd_main.cc
-                  pfsd.cc
-                  pfsd_svr.cc
-                  pfsd_chnl.cc
-                  pfsd_chnl_shm.cc
-                  pfsd_common.cc
-                  pfsd_memory.cc
-                  pfsd_option.cc
-                  pfsd_shm.cc
-                  pfsd_worker.cc
-    )
+# Include current source directory, other directories are inherited
+# from libpfs target
+target_include_directories(pfsd_server PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# macro definition
-add_definitions(
-	-DPFS_IOCHNL_CLI
-)
+target_link_libraries(pfsd_server PUBLIC pfs pthread)
 
-
-# pfsd daemon
 add_executable(pfsdaemon
-    ${SRC_LIST_PFSD}
-    )
-
-add_dependencies(pfsdaemon
-    pfs
-    )
-
-if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-    set(CXXFLAGS ${CXXFLAGS}  -march=native)
-endif()
+    pfsd_main.cc
+)
 
 target_link_libraries(pfsdaemon
-    -Wl,--start-group
-    -Wl,--no-as-needed
-    pfs
+    pfsd_server
     libzlog.a
     pthread
-    -Wl,--end-group
 )
 
-target_compile_definitions(pfsdaemon PUBLIC PFSD_SERVER)
-
-SET_TARGET_PROPERTIES(pfsdaemon PROPERTIES LINKER_LANGUAGE CXX)
-
 install(TARGETS pfsdaemon DESTINATION "${PKG_DIR}/bin")
+install(TARGETS pfsd_server LIBRARY DESTINATION "${PKG_DIR}/lib")
 
