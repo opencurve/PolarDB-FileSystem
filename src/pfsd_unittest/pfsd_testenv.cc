@@ -15,7 +15,6 @@
 
 #include "pfsd_testenv.h"
 #include "pfsd_cli.h"
-#include "pfs_mount.h"
 #include "pfsd_common.h"
 #include <iostream>
 #include <stdlib.h>
@@ -31,7 +30,7 @@ void PFSDTestEnv::SetUp() {
     cout << "Start PFSDTest of host " << hostid_
         << " on clsuter " << cluster_ << ", pbd " << pbdname_ << endl;
 
-    int flags = MNTFLG_TOOL | MNTFLG_RDWR | MNTFLG_LOG;
+    int flags = MNTFLG_TOOL | MNTFLG_RD | MNTFLG_WR | MNTFLG_LOG;
     int err = pfsd_sdk_init(PFSD_SDK_THREADS, PFSD_USER_PID_DIR, TEST_CONNECT_TIMEOUT,
                             cluster_.data(), pbdname_.data(), hostid_, flags);
     if (err < 0) {
