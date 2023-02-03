@@ -92,7 +92,6 @@ static void
 pfs_curvedev_destroy_ioq(pfs_ioq_t *ioq)
 {
     pfs_curveioq_t *dkioq = (pfs_curveioq_t *)ioq;
-    int err;
 
     PFS_ASSERT(dkioq->dkq_inflight_count == 0);
     PFS_ASSERT(TAILQ_EMPTY(&dkioq->dkq_inflight_queue));
@@ -109,7 +108,6 @@ static pfs_ioq_t *
 pfs_curvedev_create_ioq(pfs_dev_t *dev)
 {
     pfs_curveioq_t *dkioq;
-    int err;
 
     dkioq = (pfs_curveioq_t *)pfs_mem_malloc(sizeof(*dkioq), M_CURVE_IOQ);
     if (dkioq == NULL) {
@@ -478,7 +476,6 @@ pfs_curvedev_submit_io(pfs_dev_t *dev, pfs_ioq_t *ioq, pfs_devio_t *io)
 static pfs_devio_t *
 pfs_curvedev_wait_io(pfs_dev_t *dev, pfs_ioq_t *ioq, pfs_devio_t *io)
 {
-    pfs_curvedev_t *dkdev = (pfs_curvedev_t *)dev;
     pfs_curveioq_t *dkioq = (pfs_curveioq_t *)ioq;
     pfs_devio_t *nio = nullptr;
 
