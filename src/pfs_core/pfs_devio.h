@@ -24,15 +24,9 @@
 #include "pfs_devstat.h"
 #include "pfs_impl.h"
 
-#define CL_POLAR	"polarstore"
-#define CL_PANGU	"river"
 #define CL_DISK		"disk"
 #define CL_CURVE	"curve"
-#ifndef PFS_DISK_IO_ONLY
-#define CL_DEFAULT	CL_POLAR
-#else
 #define CL_DEFAULT	CL_DISK
-#endif
 
 #define MAGIC_PBDNAME	"0-0"
 
@@ -60,10 +54,6 @@ typedef struct pbdinfo {
 /* supported devices */
 typedef enum pfs_devtype {
 	PFS_DEV_INVALID	= 0,
-#ifndef PFS_DISK_IO_ONLY
-	PFS_DEV_POLAR,
-	PFS_DEV_PANGU,
-#endif
 	PFS_DEV_DISK,
 	PFS_DEV_CURVE,
 	PFS_DEV_CURVE2,

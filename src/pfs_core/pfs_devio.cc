@@ -37,17 +37,11 @@ static int64_t		devstat_enable = PFS_OPT_DISABLE;
 PFS_OPTION_REG(devstat_enable, pfs_check_ival_switch);
 
 extern char pfs_trace_pbdname[PFS_MAX_PBDLEN];
-extern struct pfs_devops pfs_polardev_ops;
-//extern struct pfs_devops pfs_pangudev_ops;
 extern struct pfs_devops pfs_diskdev_ops;
 extern struct pfs_devops pfs_curvedev_ops;
 static struct pfs_devops *pfs_dev_ops[] = {
-#ifndef PFS_DISK_IO_ONLY
-	&pfs_polardev_ops,
-#endif
-	//&pfs_pangudev_ops,
 	&pfs_diskdev_ops,
-	&pfs_curvedev_ops,
+	//&pfs_curvedev_ops,
 	NULL,
 };
 
@@ -129,8 +123,6 @@ init_pfs_dev_mtx()
 pfs_devtype_t
 pfsdev_type(const char *cluster, const char *devname)
 {
-	int cnt = 0;
-
 	if (strlen(cluster) >= PFS_MAX_CLUSTERLEN ||
 	    strlen(devname) >= PFS_MAX_PBDLEN) {
 		pfs_etrace("cluster or pbdname is too long\n");
@@ -143,22 +135,8 @@ pfsdev_type(const char *cluster, const char *devname)
 	/* local disk */
 	if (strcmp(cluster, CL_DISK) == 0)
 		return PFS_DEV_DISK;
-    if (strcmp(cluster, CL_CURVE) == 0)
-        return PFS_DEV_CURVE;
-#ifndef PFS_DISK_IO_ONLY
-	/* polarstore PBD */
-	if (strcmp(cluster, CL_POLAR) == 0 && isdigit(devname[0]))
-		return PFS_DEV_POLAR;
-
-	/* pangu uri */
-	for (int i = 0; devname[i] != '\0'; i++)
-		if (devname[i] == '-')
-			cnt++;
-	if (strncmp(cluster, CL_PANGU, strlen(CL_PANGU)) == 0
-	    && strncmp(devname, "pangu-", 6) == 0
-	    && cnt == 3)
-		return PFS_DEV_PANGU;
-#endif
+//if (strcmp(cluster, CL_CURVE) == 0)
+//        return PFS_DEV_CURVE;
 	pfs_etrace("invalid cluster-pbdname combination {%s, %s}\n",
 	    cluster, devname);
 	return PFS_DEV_INVALID;
@@ -608,34 +586,17 @@ pfsdev_increase_epoch(int devi)
 
 	PFS_ASSERT(0 <= devi && devi < PFS_MAX_NCHD);
 	dev = pfs_devs[devi];
-    return pfs_dev_increase_epoch(dev);
+	return pfs_dev_increase_epoch(dev);
 }
 
 const char *
 pfsdev_trace_pbdname(const char *cluster, const char *pbdname)
 {
-	int n;
-	char comp[3][PFS_MAX_PBDLEN];
-
 	switch (pfsdev_type(cluster, pbdname)) {
 	case PFS_DEV_DISK:
 		return MAGIC_PBDNAME;
-#ifndef PFS_DISK_IO_ONLY
-	case PFS_DEV_POLAR:
-		return pbdname;
-	case PFS_DEV_PANGU:
-		n = sscanf(pbdname, "pangu-%[^-]-%[^-]-%[^-]",
-			comp[0], comp[1], comp[2]);
-		PFS_VERIFY(n == 3);	// XXX: namei should guarantee it ok
-		n = snprintf(pfs_trace_pbdname, sizeof(pfs_trace_pbdname),
-			"%s-1", comp[1]);
-		PFS_VERIFY(n < PFS_MAX_PBDLEN);
-		pfs_itrace("pangu device %s uses %s as its pbdname for"
-		    " tracing\n", pbdname, pfs_trace_pbdname);
-		return pfs_trace_pbdname;
-#endif
-    case PFS_DEV_CURVE:
-        return pbdname;
+	case PFS_DEV_CURVE:
+        	return pbdname;
 	default:
 		return NULL;
 	}
