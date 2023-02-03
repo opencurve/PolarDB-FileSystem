@@ -318,9 +318,9 @@ static int
 pfs_inode_del(pfs_inode_t *in, pfs_dblk_t *dblk)
 {
 	int err = 0;
-	pfs_blktag_phy_t *bt;
-	pfs_inode_phy_t *phyin;
-	pfs_txop_t *bttop, *phyintop;
+	pfs_blktag_phy_t *bt = NULL;
+	pfs_inode_phy_t *phyin = NULL;
+	pfs_txop_t *bttop = NULL, *phyintop = NULL;
 	pfs_mount_t *mnt = in->in_mnt;
 	pfs_blkno_t blkno = dblk->db_blkno;
 	uint64_t btno;
@@ -430,9 +430,9 @@ int
 pfs_inode_add(pfs_inode_t *in, pfs_blkid_t blkid)
 {
 	int err;
-	pfs_blktag_phy_t *bt;
-	pfs_inode_phy_t *phyin;
-	pfs_txop_t *bttop, *phyintop;
+	pfs_blktag_phy_t *bt = NULL;
+	pfs_inode_phy_t *phyin = NULL;
+	pfs_txop_t *bttop = NULL, *phyintop = NULL;
 	pfs_tx_t *tx = pfs_tls_get_tx();
 
 	err = 0;
@@ -1613,8 +1613,8 @@ pfs_inodephy_setxattr(pfs_mount_t *mnt, pfs_ino_t ino, const char *name,
     const void *value, size_t size)
 {
 	pfs_tx_t *tx = pfs_tls_get_tx();
-	pfs_inode_phy_t *phyin;
-	pfs_txop_t *intop;
+	pfs_inode_phy_t *phyin = NULL;
+	pfs_txop_t *intop = NULL;
 	int err;
 
 	if (!pfs_version_has_features(mnt, PFS_FEATURE_PVTID))
