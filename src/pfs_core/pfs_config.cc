@@ -106,7 +106,7 @@ add_new_sect(pfs_config_t *config, const char *sect_name)
 
 	key_len = strlen(sect_name);
 	if (key_len < MAX_KEY_LEN) {
-		strncpy(sect->sect_name, sect_name, key_len+1);
+		strncpy(sect->sect_name, sect_name, sizeof(sect->sect_name));
 	} else {
 		pfs_mem_free(sect, M_CONFIG_SECT);
 		return NULL;
@@ -192,8 +192,9 @@ add_new_key_value(pfs_config_t *config, const char *sect_name, const char *key, 
 	key_len = strlen(key);
 	value_len = strlen(value);
 	if ((key_len < MAX_KEY_LEN) && (value_len < MAX_VAL_LEN)) {
-		strncpy(kv->kv_key, key, key_len+1);
-		strncpy(kv->kv_value, value, value_len+1);
+		strncpy(kv->kv_key, key, sizeof(kv->kv_key));
+		strncpy(kv->kv_value, value, sizeof(kv->kv_value));
+		kv->kv_value[MAX_VAL_LEN-1] = 0;
 	} else {
 		pfs_mem_free(kv, M_CONFIG_KV);
 		return NULL;

@@ -1202,8 +1202,10 @@ chnl_connection_sync_shm(chnl_ctx_shm_t *ctx, const char *cluster,
 
 	strncpy(file_data->sync_data.cluster, cluster,
 	    sizeof(file_data->sync_data.cluster));
+	file_data->sync_data.cluster[sizeof(file_data->sync_data.cluster)-1] = '\0';
 	strncpy(file_data->sync_data.pbdname, pbdname,
 	    sizeof(file_data->sync_data.pbdname));
+	file_data->sync_data.pbdname[sizeof(file_data->sync_data.pbdname)-1] = '\0';
 
 	result = flock(ctx->ctx_pidfile_fd, LOCK_EX | LOCK_NB);
 	if (result < 0) {
