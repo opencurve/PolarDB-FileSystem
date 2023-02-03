@@ -105,7 +105,7 @@ typedef int64_t			pfs_ino_t;	/* inode number */
 #define	ERR_MSG(errcode)	do {				\
 	pfs_etrace("%s:%d failed, error %d: %s\n",		\
 	    __func__, __LINE__, (int)errcode, 			\
-	    errcode ? strerror(errcode) : "pfs internal");	\
+	    (errcode != 0) ? strerror(errcode) : "pfs internal");	\
 } while(0)
 
 #define ERR_GOTO(errcode, label) do {				\
