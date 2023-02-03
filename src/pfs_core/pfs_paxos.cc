@@ -186,7 +186,7 @@ read_leader(pfs_mount_t *mnt, struct pfs_leader_record *lr, uint32_t *checksum)
 static int
 verify_leader(pfs_mount_t *mnt, struct pfs_leader_record *lr, uint32_t checksum)
 {
-	struct pfs_leader_record leader_rr;
+	//struct pfs_leader_record leader_rr;
 	int result;
 
 	if (lr->magic == PFS_LEADER_CLEAR)

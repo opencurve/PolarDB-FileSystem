@@ -48,7 +48,7 @@ static moodycamel::BlockingConcurrentQueue<WorkItem> g_work_queue;
 static void *io_worker(void *arg);
 static void *io_poller(void *arg);
 #define IO_WORKERS 100
-static pthread_t io_worker_h[IO_WORKERS];
+//static pthread_t io_worker_h[IO_WORKERS];
 
 worker_t *g_pfsd_worker;
 
@@ -242,7 +242,6 @@ static void* io_poller(void *arg)
 
 static void *io_worker(void *arg)
 {
-	worker_t *wk = (worker_t*)(arg);
 	moodycamel::ConsumerToken ctok(g_work_queue);
 
 	char name[32];

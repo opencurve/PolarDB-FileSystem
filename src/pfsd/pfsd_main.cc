@@ -245,7 +245,6 @@ pfsd_usage(const char *prog)
 
 int main(int ac, char *av[])
 {
-	int err;
 	pfsd_option_t opt;
 
 	pfsd_option_init(&opt);

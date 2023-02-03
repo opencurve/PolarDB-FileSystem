@@ -379,7 +379,6 @@ pfsd_close_all_files(struct mountargs *mp)
 {
 	// The function can not be protected within fdtbl_mtx because
 	// it will be locked in pfsd_close_file.
-	int ret = 0;
 	pfsd_file_t *file;
 	pthread_mutex_lock(&fdtbl_mtx);
 	for (int i = 0; i < PFSD_MAX_NFD; ++i) {

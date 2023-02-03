@@ -162,7 +162,8 @@ uds_send(int sock, void *buf, int len, int flags)
 }
 
 static int
-conn_handle_errorinject(int clisock, msg_header_t *mh, admin_info_t *ai)
+conn_handle_errorinject(int clisock, msg_header_t *mh,
+     admin_info_t *ai)
 {
 	return 0;
 }

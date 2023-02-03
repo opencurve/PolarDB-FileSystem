@@ -25,7 +25,7 @@
 #define READ_SIZE (1 * 1024)
 
 int test_file(const char *cluster, int host_id, std::string pbd_path, std::string pbd) {
-    int r = 0, fd = pfsd_open((pbd_path + "hello.txt").data(), O_RDWR|O_CREAT, 0);
+    int fd = pfsd_open((pbd_path + "hello.txt").data(), O_RDWR|O_CREAT, 0);
     printf("hello.txt: open fd %d\n", fd);
     if (fd < 0) {
         printf("hello.txt: open failed %d\n", errno);

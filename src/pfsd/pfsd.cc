@@ -161,7 +161,6 @@ static void *
 pfsd_main_thread_entry(void *arg)
 {
 	const int ZOMBIE_RECYCLE_WAIT = 5;
-	int windex = 0;
 
 	while (!g_pfsd_stop) {
 		/* recycle zombie */

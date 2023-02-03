@@ -926,7 +926,7 @@ static char *pfs_log_writebuf_get(pfs_log_t *log, uint64_t offset, size_t len,
 {
 	pfs_file_t *logf = log->log_file;
 	uint64_t align_off = offset / log->log_writebuf_sz * log->log_writebuf_sz;
-	ssize_t rlen, wlen;
+	ssize_t rlen;
 
 	if (offset < log->log_writebuf_off ||
 			offset >= log->log_writebuf_off + log->log_writebuf_sz) {
@@ -972,7 +972,7 @@ static ssize_t pfs_log_writebuf_fill(pfs_log_t *log, char *buf, size_t len,
 int
 pfs_log_write(pfs_log_t *log, char *buf, size_t buflen, uint64_t offset)
 {
-	pfs_file_t *logf = log->log_file;
+	//pfs_file_t *logf = log->log_file;
 	pfs_leader_record_t *lr = &log->log_leader;
 	int wlen;
 	size_t left;

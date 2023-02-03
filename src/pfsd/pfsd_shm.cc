@@ -452,9 +452,9 @@ pfsd_shm_destroy(pfsd_shm_t *shm)
 	if (shm == NULL)
 		return -1;
 
-	char *channels = (char *)(shm + 1);
-	size_t unit_size = ((pfsd_iochannel_t *)channels)->ch_unitsize;
-	int nreq = ((pfsd_iochannel_t *)channels)->ch_max_req;
+	//char *channels = (char *)(shm + 1);
+	//size_t unit_size = ((pfsd_iochannel_t *)channels)->ch_unitsize;
+	//int nreq = ((pfsd_iochannel_t *)channels)->ch_max_req;
 
 	memset(shm, 0, shm->sh_size);
 	return 0;

@@ -389,7 +389,7 @@ static int
 chnl_connect_socket(chnl_ctx_shm_t *ctx)
 {
 	struct sockaddr_un sockaddr;
-	int sock, rc, flags, n;
+	int sock, rc, flags;
 	socklen_t len;
 
 	memset(&sockaddr, 0, sizeof(struct sockaddr_un));
@@ -404,7 +404,7 @@ chnl_connect_socket(chnl_ctx_shm_t *ctx)
 	len = sizeof(sockaddr);
 #ifdef PFSD_SERVER
 	/* small buffer is enough, don't auto scaling */
-	n = 512;
+	int n = 512;
 	setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n));
 
 	unlink(ctx->ctx_io_sock_addr);
@@ -1578,7 +1578,6 @@ chnl_notify_server(chnl_ctx_shm_t *ctx)
 {
 	char c = 'a';
 
-	int expect = 0;
 	for (;;){
 		pthread_rwlock_rdlock(&ctx->ctx_io_sock_rwlock);
 		int gen = ctx->ctx_io_sock_gen;
