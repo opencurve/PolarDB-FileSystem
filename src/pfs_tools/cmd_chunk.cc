@@ -31,10 +31,6 @@
 #include "pfs_tx.h"
 #include "pfs_paxos.h"
 
-#ifndef PFS_DISK_IO_ONLY
-#include "pfs_iochnl.h"
-#endif
-
 /*
  * a. Block used status table(BUST)
  * ------
