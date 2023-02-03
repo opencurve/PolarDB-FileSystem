@@ -73,6 +73,7 @@ pfsd_robust_mutex_unlock(pthread_mutex_t *mutex)
 		return -1;
 
 	int r = pthread_mutex_unlock(mutex);
+	r = r;
 	assert (r == 0);
 	return 0;
 }
