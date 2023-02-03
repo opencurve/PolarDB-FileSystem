@@ -41,7 +41,7 @@ extern struct pfs_devops pfs_diskdev_ops;
 extern struct pfs_devops pfs_curvedev_ops;
 static struct pfs_devops *pfs_dev_ops[] = {
 	&pfs_diskdev_ops,
-	//&pfs_curvedev_ops,
+	&pfs_curvedev_ops,
 	NULL,
 };
 
@@ -135,8 +135,8 @@ pfsdev_type(const char *cluster, const char *devname)
 	/* local disk */
 	if (strcmp(cluster, CL_DISK) == 0)
 		return PFS_DEV_DISK;
-//if (strcmp(cluster, CL_CURVE) == 0)
-//        return PFS_DEV_CURVE;
+	if (strcmp(cluster, CL_CURVE) == 0)
+		return PFS_DEV_CURVE;
 	pfs_etrace("invalid cluster-pbdname combination {%s, %s}\n",
 	    cluster, devname);
 	return PFS_DEV_INVALID;
