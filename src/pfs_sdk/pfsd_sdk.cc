@@ -261,6 +261,7 @@ retry:
 	/* fill request */
 	req->type = PFSD_REQUEST_INCREASEEPOCH;
 	strncpy(req->i_req.g_pbd, pbdname, PFS_MAX_PBDLEN);
+	req->i_req.g_pbd[sizeof(req->i_req.g_pbd)-1] = 0;
 
 	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
@@ -412,6 +413,7 @@ retry:
 	/* fill request */
 	req->type = PFSD_REQUEST_GROWFS;
 	strncpy(req->g_req.g_pbd, pbdname, PFS_MAX_PBDLEN);
+	req->g_req.g_pbd[sizeof(req->g_req.g_pbd)-1] = 0;
 
 	pfsd_chnl_send_recv(conn_id, req, 0, rsp, 0, NULL, pfsd_tolong(ch), 0);
 	CHECK_STALE(rsp);
