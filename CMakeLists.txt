@@ -94,9 +94,9 @@ install(
   
 install(
   FILES
-	src/pfsd/pfsd.init
+	pfs_init
   DESTINATION "/etc/init.d/"
-  RENAME pfsd_env
+  RENAME pfs_init
 )
 
 install(
