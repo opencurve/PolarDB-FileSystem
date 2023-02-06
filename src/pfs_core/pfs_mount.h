@@ -223,10 +223,4 @@ pfs_ispfsd(pfs_mount_t *mnt)
 	return (mnt->mnt_flags & MNTFLG_PFSD) == MNTFLG_PFSD;
 }
 
-static inline bool                                                              
-pfs_ispfsd_internal(pfs_mount_t *mnt)                                           
-{                                                                               
-	return !!(mnt->mnt_flags & MNTFLG_PFSD_INTERNAL);
-}
-
 #endif	/* _PFS_MOUNT_H_ */
