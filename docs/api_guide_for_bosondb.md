@@ -1,5 +1,5 @@
-使用bosondb专用版本pfs
-======================
+使用bosondb分支专用版本pfs
+=========================
 
 # 背景
 
@@ -21,7 +21,7 @@ mount了pfs卷后pfsdaemon不存在了，为了解决这个问题，还需要把
 
 # 编程指南
 
-* bosondb应该只会使用到libpfsd_s.so 和 libpfs.so
+* bosondb应该只会使用到libpfsd_s.so 和 libpfs.so, 不要连接libpfsd_c.so
 
 * 为内嵌的pfsdaemon初始化options:
 ```
