@@ -83,6 +83,19 @@ ssize_t pfs_file_pread(pfs_file_t *file, void *buf, size_t len, off_t offset);
 ssize_t pfs_file_pwrite(pfs_file_t *file, const void *buf, size_t len, off_t offset);
 int	pfs_file_release(pfs_mount_t *mnt, pfs_ino_t ino, uint64_t btime);
 int	pfs_file_xsetxattr(pfs_file_t *file, const char *name, const void *value, size_t size);
+ssize_t
+pfs_file_read(pfs_inode_t *in, void *buf, size_t len, off_t offset,
+    bool locked, uint64_t btime);
+ssize_t
+pfs_file_write(pfs_inode_t *in, const void *buf, size_t len, off_t *off,
+    bool locked, uint64_t btime);
+off_t pfs_file_lseek(pfs_file_t *file, off_t offset, int whence);
+int pfs_file_stat(pfs_inode_t *in, struct stat *st, uint64_t btime);
+ssize_t pfs_file_truncate(pfs_inode_t *in, off_t len, uint64_t btime);
+ssize_t pfs_file_write(pfs_inode_t *in, const void *buf, size_t len, off_t *off,
+    bool locked, uint64_t btime);
+ssize_t pfs_file_allocate(pfs_inode_t *in, off_t offset, size_t len, int mode,          
+    uint64_t btime);
 
 typedef	struct admin_buf	admin_buf_t;
 int 	pfs_fdtbl_dump(admin_buf_t *ab);

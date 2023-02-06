@@ -23,12 +23,10 @@
 #include "pfs_mount.h"
 #include "pfs_trace.h"
 #include "pfs_api.h"
+#include "pfs_file.h"
+#include "pfs_dir.h"
 #include "pfsd_svr.h"
 #include "pfsd_log.h"
-#include "pfs_file.h"
-
-#include "pfs_file.cc"
-
 #define OFF_MAX ~((off_t)1 << (sizeof(off_t) * 8 - 1))
 #define INVALID_INO  (~0LL)
 

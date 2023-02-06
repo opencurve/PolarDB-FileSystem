@@ -43,6 +43,7 @@ add_library(pfs SHARED
     pfs_version.cc
     pfs_chunk.cc
     pfs_avl.cc
+    pfs_brwlock.cc
 )
 
 target_include_directories(pfs

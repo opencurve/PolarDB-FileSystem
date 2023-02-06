@@ -389,7 +389,7 @@ pfs_file_put(pfs_file_t *file)
 	mutex_unlock(&fdtbl_mtx);
 }
 
-static ssize_t
+ssize_t
 pfs_file_truncate(pfs_inode_t *in, off_t len, uint64_t btime)
 {
 	pfs_mount_t	*mnt = in->in_mnt;
@@ -557,7 +557,7 @@ out:
 	return err;
 }
 
-static ssize_t
+ssize_t
 pfs_file_read(pfs_inode_t *in, void *buf, size_t len, off_t offset,
     bool locked, uint64_t btime)
 {
@@ -651,7 +651,7 @@ pfs_file_read(pfs_inode_t *in, void *buf, size_t len, off_t offset,
  * write operation has no effect because of its change isn't written into
  * journal.
  */
-static ssize_t
+ssize_t
 pfs_file_write(pfs_inode_t *in, const void *buf, size_t len, off_t *off,
     bool locked, uint64_t btime)
 {
@@ -768,7 +768,7 @@ pfs_file_setxattr(pfs_inode_t *in, const char *name, const void *value,
 	return err;
 }
 
-static int
+int
 pfs_file_stat(pfs_inode_t *in, struct stat *st, uint64_t btime)
 {
 	int err;
@@ -798,7 +798,7 @@ pfs_file_close_locked(pfs_file_t *file)
 	return fd_free(file, true);
 }
 
-static off_t
+off_t
 pfs_file_lseek(pfs_file_t *file, off_t offset, int whence)
 {
 	off_t old_offset, new_offset;
@@ -845,7 +845,7 @@ check_file_offset:
 	}
 }
 
-static ssize_t
+ssize_t
 pfs_file_allocate(pfs_inode_t *in, off_t offset, size_t len, int mode,
     uint64_t btime)
 {
