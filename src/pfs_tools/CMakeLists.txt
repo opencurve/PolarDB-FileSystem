@@ -54,7 +54,7 @@ set(CXXFLAGS
 
 target_link_libraries(pfs-tools
     pfs
-    pfsd_cli
+    pfsd_c
     pthread
 )
 

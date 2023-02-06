@@ -18,7 +18,7 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/src/trace/include/
 )
 
-add_library(pfsd_cli SHARED
+add_library(pfsd_c SHARED
     ../pfsd/pfsd_common.cc
     ../pfsd/pfsd_chnl.cc
     ../pfsd/pfsd_chnl_shm.cc
@@ -30,15 +30,20 @@ add_library(pfsd_cli SHARED
     pfsd_sdk_log.cc
 )
 
-target_compile_definitions(pfsd_cli PUBLIC PFSD_CLIENT)
-target_link_libraries(pfsd_cli rt pthread)
+set_target_properties(pfsd_c PROPERTIES
+    VERSION 2.1.5
+    SOVERSION 2
+)
+
+target_compile_definitions(pfsd_c PUBLIC PFSD_CLIENT)
+target_link_libraries(pfsd_c rt pthread)
 
 # pfsd shm tool
 add_executable(pfsd_shm_tool
     pfsd_shm_tool.cc
 )
-target_link_libraries(pfsd_shm_tool pfsd_cli)
+target_link_libraries(pfsd_shm_tool pfsd_c)
 
-install(TARGETS pfsd_cli ARCHIVE DESTINATION "${PKG_DIR}/lib")
+install(TARGETS pfsd_c ARCHIVE DESTINATION "${PKG_DIR}/lib")
 install(TARGETS pfsd_shm_tool DESTINATION "${PKG_DIR}/bin")
 

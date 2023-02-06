@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(pfsd_server SHARED
+add_library(pfsd_s SHARED
     pfsd.cc
     pfsd_svr.cc
     pfsd_chnl.cc
@@ -25,24 +25,29 @@ add_library(pfsd_server SHARED
 )
 
 # Set public definitions used by ourself and pfsdaemon
-target_compile_definitions(pfsd_server PUBLIC PFSD_SERVER)
+target_compile_definitions(pfsd_s PUBLIC PFSD_SERVER)
 
 # Include current source directory, other directories are inherited
 # from libpfs target
-target_include_directories(pfsd_server PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(pfsd_s PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(pfsd_server PUBLIC pfs pthread)
+target_link_libraries(pfsd_s PUBLIC pfs pthread)
 
 add_executable(pfsdaemon
     pfsd_main.cc
 )
 
 target_link_libraries(pfsdaemon
-    pfsd_server
+    pfsd_s
     libzlog.a
     pthread
 )
 
+set_target_properties(pfsd_s PROPERTIES
+    VERSION 2.1.5
+    SOVERSION 2
+)
+
 install(TARGETS pfsdaemon DESTINATION "${PKG_DIR}/bin")
-install(TARGETS pfsd_server LIBRARY DESTINATION "${PKG_DIR}/lib")
+install(TARGETS pfsd_s LIBRARY DESTINATION "${PKG_DIR}/lib")
 

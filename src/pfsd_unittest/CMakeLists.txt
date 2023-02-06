@@ -34,7 +34,7 @@ set(CXXFLAGS
 
 target_link_libraries(pfsd_unittest
     gtest
-    pfsd_cli
+    pfsd_c
     pthread
 )
 
@@ -45,7 +45,7 @@ add_executable(
 
 target_link_libraries(sdk_demo
     gtest
-    pfsd_cli
+    pfsd_c
     pthread
 )
 
@@ -55,6 +55,6 @@ add_executable(
 )
 target_link_libraries(mount_two_pbds
     gtest
-    pfsd_cli
+    pfsd_c
     pthread
 )
