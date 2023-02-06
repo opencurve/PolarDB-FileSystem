@@ -83,9 +83,9 @@ pfsd_option具有以下结构:
   ```
 
   读写模式应该使用的flags:<br>
-  MNTFLG_RD|MNTFLG_WR|MNTFLG_LOG|MNTFLG<br>
+  MNTFLG_RD|MNTFLG_WR|MNTFLG_LOG<br>
   只读模式使用的flags:<br>
-  MNTFLG_RD|MNTFLG_LOG|MNTFLG<br>
+  MNTFLG_RD|MNTFLG_LOG<br>
   函数返回0表示成功。
 
   - 卸载卷
