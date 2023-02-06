@@ -40,6 +40,7 @@
 #include "pfs_stat.h"
 #include "pfs_namecache.h"
 #include "pfs_config.h"
+#include "pfs_brwlock.h"
 
 extern "C" {
     unsigned int __attribute__((weak)) pfs_server_id = 1984;
@@ -64,7 +65,7 @@ typedef struct orphan_largefile_arg {
 typedef struct mountentry {
 	int			me_id;
 	int64_t			me_epoch;
-	pthread_rwlock_t	me_rwlock;
+	pfs_brwlock_t		me_rwlock;
 	pfs_mount_t		*me_mount;
 } mountentry_t;
 
@@ -81,7 +82,7 @@ init_pfs_mountentry()
 		me = &mount_entry[i];
 		me->me_epoch = 1;
 		me->me_id = i;
-		rwlock_init(&me->me_rwlock, NULL);
+		pfs_brwlock_init(&me->me_rwlock);
 	}
 }
 
@@ -94,19 +95,19 @@ pfs_init_failed(pfs_mount_t *mnt)
 inline void
 mountentry_rdlock(mountentry_t *me)
 {
-	rwlock_rdlock(&me->me_rwlock);
+	pfs_brwlock_rdlock(&me->me_rwlock);
 }
 
 inline void
 mountentry_wrlock(mountentry_t *me)
 {
-	rwlock_wrlock(&me->me_rwlock);
+	pfs_brwlock_wrlock(&me->me_rwlock);
 }
 
 inline void
 mountentry_unlock(mountentry_t *me)
 {
-	rwlock_unlock(&me->me_rwlock);
+	pfs_brwlock_unlock(&me->me_rwlock);
 }
 
 inline void
