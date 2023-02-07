@@ -141,7 +141,11 @@ pfs_direntry_setname(pfs_mount_t *mnt, pfs_direntry_phy_t *de, const char *newna
 {
 	size_t densize = sizeof(de->de_name);
 
-	memcpy(de->de_name, newname, densize);
+#pragma GCC diagnostic push                                                     
+#pragma GCC diagnostic ignored "-Wstringop-truncation"                          
+        strncpy(de->de_name, newname, densize);                                 
+#pragma GCC diagnostic pop
+
 	if (DE_ISEXT(de)) {
 		PFS_ASSERT(pfs_version_has_features(mnt, PFS_FEATURE_EXTNAME));
 		return 0;
