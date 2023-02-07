@@ -914,7 +914,7 @@ static int pfs_log_writebuf_flush(pfs_log_t *log)
 	if (log->log_writebuf_dirty) {
 		wlen = pfs_file_pwrite(logf, log->log_writebuf, log->log_writebuf_sz,
 				log->log_writebuf_off);
-		if (wlen != log->log_writebuf_sz)
+		if ((size_t)wlen != log->log_writebuf_sz)
 			return -EIO;
 		log->log_writebuf_dirty = 0;
 	}
@@ -940,7 +940,7 @@ static char *pfs_log_writebuf_get(pfs_log_t *log, uint64_t offset, size_t len,
 			if (rlen <= 0) {
 				return NULL;
 			}
-			PFS_ASSERT(rlen == log->log_writebuf_sz);
+			PFS_ASSERT((size_t)rlen == log->log_writebuf_sz);
 		}
 		log->log_writebuf_off = align_off;
 	}

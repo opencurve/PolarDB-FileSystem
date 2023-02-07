@@ -152,7 +152,7 @@ chnl_accept_shm_sync(chnl_ctx_shm_t *ctx, pfsd_chnl_op_t *op,
 		result = pread(fd, &file_data, sizeof(file_data), 0);
 	} while (result < 0 && errno == EINTR);
 
-	if (result < 0 || result < sizeof(file_data.sync_data)) {
+	if (result < 0 || (size_t)result < sizeof(file_data.sync_data)) {
 		pfsd_error("accept conn read sync_data bytes %d, expect %lu",
 		    (int)result, sizeof(file_data.sync_data));
 		close(fd);
@@ -167,7 +167,7 @@ chnl_accept_shm_sync(chnl_ctx_shm_t *ctx, pfsd_chnl_op_t *op,
 	pfsd_info("when accept conn, pread sync_data fine %ld", result);
 
 	/* check if reconnect */
-	if (result >= sizeof(file_data)) {
+	if ((size_t)result >= sizeof(file_data)) {
 		if (pfsd_is_valid_connid(file_data.ack_data.v1.shm_connect_id)) {
 			connect_id = file_data.ack_data.v1.shm_connect_id;
 			pfsd_info("re accept with conn id %d", connect_id);
@@ -854,7 +854,7 @@ chnl_recover_shm_file(void *ctx, void *op, const char *fname)
 			    old_conn_id, data.ack_data.v1.mntid);
 		}else
 			pfsd_info("process recover %s", data.sync_data.pbdname);
-	} else if (result >= sizeof(data.sync_data) && result < sizeof(data)) {
+	} else if (result >= (ssize_t)sizeof(data.sync_data) && result < (ssize_t) sizeof(data)) {
 		need_abort = false;
 		/**
 		 * Maybe we have partially replied a packet, clean the old
@@ -1220,7 +1220,7 @@ chnl_connection_sync_shm(chnl_ctx_shm_t *ctx, const char *cluster,
 	    offsetof(pidfile_data_t, ack_data)));
 	int pfs_mount_epoch = mount_epoch_get(pbdname);
 	if (result == sizeof(file_data->ack_data)) {
-		if (file_data->ack_data.v1.shm_mnt_epoch > pfs_mount_epoch)
+		if (file_data->ack_data.v1.shm_mnt_epoch > (unsigned) pfs_mount_epoch)
 			pfs_mount_epoch = mount_epoch_set(pbdname, file_data->ack_data.v1.shm_mnt_epoch);
 		memset(&file_data->ack_data, 0, sizeof(file_data->ack_data));
 	}
@@ -1439,7 +1439,7 @@ chnl_connection_poll_shm(chnl_ctx_shm_t *ctx, const char *pbdname, int timeout_u
 			} else {
 				int pfs_mount_epoch = mount_epoch_get(pbdname);
 				if (file_data->ack_data.v1.shm_mnt_epoch >=
-				    pfs_mount_epoch) {
+				    (unsigned)pfs_mount_epoch) {
 					pfs_mount_epoch = file_data->ack_data.v1.shm_mnt_epoch;
 					mount_epoch_set(pbdname, pfs_mount_epoch);
 					pfsd_info(

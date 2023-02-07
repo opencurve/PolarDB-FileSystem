@@ -35,8 +35,7 @@ set(COMMON_FLAGS
 )
 
 set(CXX_FLAGS
- "-Wno-sign-compare \
-  -Wno-unused-function"
+ "-Wno-unused-function"
 )
 
 string(APPEND CMAKE_C_FLAGS " ${COMMON_FLAGS}")
