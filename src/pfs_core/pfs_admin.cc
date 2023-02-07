@@ -602,14 +602,14 @@ pfs_admin_init(const char *pbdname)
 		goto out;
 	}
 	err = listen(ai->ai_sockfd, 5);
-		if (err < 0) {
+	if (err < 0) {
 		pfs_etrace("listen on socket %d failed: %s\n", ai->ai_sockfd,
 		    strerror(errno));
 		goto out;
 	}
 
 	/*
-	 * Create a event to communicate with the new trhead.
+	 * Create a event to communicate with the new thread.
 	 */
 	ai->ai_exitfd = eventfd(0, 0);
 	if (ai->ai_exitfd < 0) {
