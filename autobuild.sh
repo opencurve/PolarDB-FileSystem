@@ -19,5 +19,5 @@ cd $BASE_DIR
 echo -e "\033[33m begin compiling PolarFS\033[0m"
 mkdir -p build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release .. && cmake --build . -j 1
+cmake -DCMAKE_BUILD_TYPE=Release .. && cmake --build . -j 1  && cmake --build . --config Release --target package
 echo -e "\033[33m end compiling, binary's in ./bin, library's in ./lib \033[0m"
