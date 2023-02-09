@@ -14,6 +14,11 @@
 cmake_minimum_required (VERSION 3.13)
 project(pfsd LANGUAGES CXX C VERSION 2.1.5)
 
+#set default build type to Release
+if (NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+endif()
+
 include(ExternalProject)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(CMakeLists-config)
