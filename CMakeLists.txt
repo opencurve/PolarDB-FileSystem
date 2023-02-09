@@ -38,7 +38,7 @@ function(CompileZLog)
 	BUILD_COMMAND make                                                        
 	INSTALL_COMMAND ""
 	)
-  add_library(zlog SHARED IMPORTED)                                            
+  add_library(zlog STATIC IMPORTED)                                            
   set_target_properties(zlog PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/zlog/src/zlog_prj/src/libzlog.a)
   add_dependencies(zlog zlog_prj)
 endfunction()
