@@ -37,14 +37,13 @@ function(CompileZLog)
 	PREFIX zlog
 	URL https://codeload.github.com/HardySimpson/zlog/zip/refs/tags/1.2.16
 	URL_HASH MD5=71f3061f16550abc585369c30d35f62d
-	DOWNLOAD_NAME zlog_1.2.16.zip
 	DOWNLOAD_EXTRACT_TIMESTAMP true
 	BUILD_IN_SOURCE 1                                                           
 	CONFIGURE_COMMAND ""                                                    
 	BUILD_COMMAND make                                                        
 	INSTALL_COMMAND ""
 	)
-  add_library(zlog STATIC IMPORTED)                                            
+  add_library(zlog STATIC IMPORTED)
   set_target_properties(zlog PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/zlog/src/zlog_prj/src/libzlog.a)
   add_dependencies(zlog zlog_prj)
 endfunction()
