@@ -39,7 +39,7 @@ add_executable(pfsdaemon
 
 target_link_libraries(pfsdaemon
     pfsd_s
-    libzlog.a
+    zlog
     pthread
 )
 
