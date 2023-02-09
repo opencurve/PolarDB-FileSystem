@@ -14,6 +14,7 @@
 cmake_minimum_required (VERSION 3.13)
 project(pfsd LANGUAGES CXX C VERSION 2.1.5)
 
+include(ExternalProject)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(CMakeLists-config)
 
@@ -22,6 +23,27 @@ set(PKG_DIR "${CMAKE_INSTALL_PREFIX}/polarstore/pfsd")
 
 list(APPEND CMAKE_INSTALL_RPATH ${CURVE_LIB_DIR})
 list(APPEND CMAKE_INSTALL_RPATH ${PKG_DIR}/lib)
+
+# The cool zlog lib is used by pfsdaemon :-)
+# Here we use function to create a new variable scope
+function(CompileZLog)
+  ExternalProject_Add(zlog_prj
+	PREFIX zlog
+	URL https://codeload.github.com/HardySimpson/zlog/zip/refs/tags/1.2.16
+	URL_HASH MD5=71f3061f16550abc585369c30d35f62d
+	DOWNLOAD_NAME zlog_1.2.16.zip
+	DOWNLOAD_EXTRACT_TIMESTAMP true
+	BUILD_IN_SOURCE 1                                                           
+	CONFIGURE_COMMAND ""                                                    
+	BUILD_COMMAND make                                                        
+	INSTALL_COMMAND ""
+	)
+  add_library(zlog SHARED IMPORTED)                                            
+  set_target_properties(zlog PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/zlog/src/zlog_prj/src/libzlog.a)
+  add_dependencies(zlog zlog_prj)
+endfunction()
+
+CompileZlog()
 
 set(COMMON_FLAGS
  "-fno-strict-aliasing \
