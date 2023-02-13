@@ -43,7 +43,7 @@
 
 typedef std::pair<pfsd_iochannel_t *, int> WorkItem;
 
-static moodycamel::BlockingConcurrentQueue<WorkItem> g_work_queue;
+static moodycamel::BlockingConcurrentQueue<WorkItem> &g_work_queue = *(new moodycamel::BlockingConcurrentQueue<WorkItem>);
 
 static void *io_worker(void *arg);
 static void *io_poller(void *arg);
