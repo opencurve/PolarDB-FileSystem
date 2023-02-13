@@ -44,15 +44,15 @@ function(CompileZLog)
 	INSTALL_COMMAND ""
 	)
   set(zlog_src_dir ${CMAKE_CURRENT_BINARY_DIR}/zlog/src/zlog_prj/src/)
-  add_library(zlog STATIC IMPORTED)
-  set_target_properties(zlog PROPERTIES IMPORTED_LOCATION ${zlog_src_dir}/libzlog.a)
 
-# Unfortunately, following does not work, we have to use include_directories()
-# to tell other targets to include the zlog dir anyway
-# set_property(TARGET zlog APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${zlog_src_dir}")
+# I have ever used IMPORTED target and set its directory property to be use
+# by dependents, but seems there is a problem:
+# https://gitlab.kitware.com/cmake/cmake/-/issues/15689
+# so I use INTERFACE instead.
 
-  include_directories(${zlog_src_dir})
-
+  add_library(zlog INTERFACE)
+  target_link_libraries(zlog INTERFACE ${zlog_src_dir}/libzlog.a)
+  target_include_directories(zlog INTERFACE ${zlog_src_dir})
   add_dependencies(zlog zlog_prj)
 endfunction()
 
