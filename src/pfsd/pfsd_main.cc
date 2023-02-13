@@ -95,6 +95,8 @@ wrapper_zlog(int level, const char *filename, const char *func, int line,
 static int
 setup_log(const char *pbdname)
 {
+	char log_path[1024];
+
 	if (o_zlog_cfg[0] == '\0') {
 		/* zlog not used */
 		return 0;
@@ -105,11 +107,21 @@ setup_log(const char *pbdname)
 		return -1;
 	}
 
+	fprintf(stderr, "%s\n", pbdname);
 	/* init logger: use env for pass logdir to zlog */
 	if (setenv("PFSD_PBDNAME", pbdname, 1) != 0) {
 		fprintf(stderr, "set env [%s] failed: %s\n", pbdname,
 			strerror(errno));
 		return -1;
+	}
+	snprintf(log_path, sizeof(log_path), "/var/log/pfsd-%s", pbdname);
+	if (mkdir(log_path, 0775)) {
+		int err_save = errno;
+		fprintf(stderr, "Can not mkdir %s, %s\n", log_path,
+			strerror(errno));
+		if (errno != EEXIST)
+			return -1;
+		errno = err_save;
 	}
 
 	int rv = dzlog_init(o_zlog_cfg, (char *)"pfsd_cat");
