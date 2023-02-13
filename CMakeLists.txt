@@ -43,8 +43,16 @@ function(CompileZLog)
 	BUILD_COMMAND make                                                        
 	INSTALL_COMMAND ""
 	)
+  set(zlog_src_dir ${CMAKE_CURRENT_BINARY_DIR}/zlog/src/zlog_prj/src/)
   add_library(zlog STATIC IMPORTED)
-  set_target_properties(zlog PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/zlog/src/zlog_prj/src/libzlog.a)
+  set_target_properties(zlog PROPERTIES IMPORTED_LOCATION ${zlog_src_dir}/libzlog.a)
+
+# Unfortunately, following does not work, we have to use include_directories()
+# to tell other targets to include the zlog dir anyway
+# set_property(TARGET zlog APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${zlog_src_dir}")
+
+  include_directories(${zlog_src_dir})
+
   add_dependencies(zlog zlog_prj)
 endfunction()
 
