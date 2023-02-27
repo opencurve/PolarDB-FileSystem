@@ -44,6 +44,6 @@ add_executable(pfsd_shm_tool
 )
 target_link_libraries(pfsd_shm_tool pfsd_c)
 
-install(TARGETS pfsd_c ARCHIVE DESTINATION "${PKG_DIR}/lib")
+install(TARGETS pfsd_c LIBRARY DESTINATION "${PKG_DIR}/lib")
 install(TARGETS pfsd_shm_tool DESTINATION "${PKG_DIR}/bin")
 
