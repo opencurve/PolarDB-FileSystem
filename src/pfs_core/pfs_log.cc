@@ -387,15 +387,27 @@ pfs_trimgroup_flush(pfs_trimgroup_t *grp, int iodesc, pfs_txid_t *tail_txid,
 	n = 0;
 	TAILQ_FOREACH(sb, &grp->g_sects, s_next) {
 		PFS_ASSERT(sb->s_txid > grp->g_ltxid && sb->s_txid <= grp->g_rtxid);
-		rv = pfsdev_pwrite(iodesc, sb->s_buf, PBD_SECTOR_SIZE, sb->s_bda);
+		rv = pfsdev_pwrite_flags(iodesc, sb->s_buf, PBD_SECTOR_SIZE, sb->s_bda, IO_NOWAIT);
 		if (rv < 0) {
 			pfs_etrace("trim log failed bda @%" PRIu64 " rv=%d\n",
 			    sb->s_bda, rv);
+			pfsdev_wait_io(iodesc);
+#if 0
+			pfsdev_flush(iodesc);
+#endif
 			return rv;
 		}
 		n++;
 	}
 	if (n > 0) {
+		rv = pfsdev_wait_io(iodesc);
+		if (rv)
+			return rv;
+#if 0
+        	rv = pfsdev_flush(iodesc);
+		if (rv)
+			return rv;
+#endif
 		*tail_txid = grp->g_rtxid;
 		*tail_offset = grp->g_roffset;
 	}
