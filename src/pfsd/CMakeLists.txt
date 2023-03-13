@@ -55,9 +55,9 @@ target_link_libraries(pfsdaemon
     -Wl,--start-group
     -Wl,--no-as-needed
     pfs
-    libzlog.a
-    pthread
     -Wl,--end-group
+    zlog
+    pthread
 )
 
 target_compile_definitions(pfsdaemon PUBLIC PFSD_SERVER)

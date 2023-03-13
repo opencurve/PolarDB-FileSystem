@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.13)
 project(pfsd CXX C ASM)
 set(pfsd_VERSION_MAJOR 2)
 set(pfsd_VERSION_MINOR 2)
@@ -23,12 +23,41 @@ include(CheckIncludeFile)
 
 message("compile pfsd for PostgreSQL")
 
+include(ExternalProject)
 
 set(PKG_DIR "/usr/local/polarstore/pfsd")
 #set default build type to Release
 if (NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
+
+# The cool zlog lib is used by pfsdaemon :-)                                    
+# Here we use function to create a new variable scope                           
+function(CompileZLog)
+  ExternalProject_Add(zlog_prj
+    PREFIX zlog
+    URL https://codeload.github.com/HardySimpson/zlog/zip/refs/tags/1.2.16
+    URL_HASH MD5=71f3061f16550abc585369c30d35f62d
+    DOWNLOAD_EXTRACT_TIMESTAMP true
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND make
+    INSTALL_COMMAND ""
+    )
+  set(zlog_src_dir ${CMAKE_CURRENT_BINARY_DIR}/zlog/src/zlog_prj/src/)
+
+# I have ever used IMPORTED target and set its directory property to be use
+# by dependents, but seems there is a problem:
+# https://gitlab.kitware.com/cmake/cmake/-/issues/15689
+# so I use INTERFACE instead.
+
+  add_library(zlog INTERFACE)
+  target_link_libraries(zlog INTERFACE ${zlog_src_dir}/libzlog.a)
+  target_include_directories(zlog INTERFACE ${zlog_src_dir})
+  add_dependencies(zlog zlog_prj)
+endfunction() 
+
+CompileZlog()
 
 include(CMakeLists-config.txt)
 
