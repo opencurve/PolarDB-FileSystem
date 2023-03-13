@@ -98,9 +98,11 @@ int pfsd_creat(const char *pbdpath, mode_t mode);
 int pfsd_open(const char *pbdpath, int flags, mode_t mode);
 
 ssize_t pfsd_read(int fd, void *buf, size_t len);
+ssize_t pfsd_read_weak(int fd, void *buf, size_t len);
 ssize_t pfsd_write(int fd, const void *buf, size_t len);
 
 ssize_t pfsd_pread(int fd, void *buf, size_t len, off_t off);
+ssize_t pfsd_pread_weak(int fd, void *buf, size_t len, off_t off);
 ssize_t pfsd_pwrite(int fd, const void *buf, size_t len, off_t off);
 
 int pfsd_truncate(const char *pbdpath, off_t len);

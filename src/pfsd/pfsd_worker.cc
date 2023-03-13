@@ -294,7 +294,8 @@ pfsd_worker_handle_request(pfsd_iochannel_t *ch, int req_index)
 			return 0;
 		}
 
-		case PFSD_REQUEST_READ: {
+		case PFSD_REQUEST_READ: 
+		case PFSD_REQUEST_READ_WEAK: {
 			MNT_STAT_API_BEGIN(MNT_STAT_API_PREAD);
 			pfs_mntstat_set_file_type(req->common_pl_req.pl_file_type);
 			pfsd_worker_handle_read(ch, req_index, &req->r_req,
@@ -529,7 +530,9 @@ void
 pfsd_worker_handle_read(pfsd_iochannel_t *ch, int req_index,
     const read_request_t *req, read_response_t *rsp)
 {
-	rsp->type = PFSD_RESPONSE_READ;
+	int weak = (req->type == PFSD_REQUEST_READ_WEAK);
+
+	rsp->type = weak ? PFSD_RESPONSE_READ_WEAK : PFSD_RESPONSE_READ;
 	rsp->r_len = -1;
 
 	CHECK_RSP_ERROR(rsp);
@@ -551,7 +554,7 @@ pfsd_worker_handle_read(pfsd_iochannel_t *ch, int req_index,
 	PFSD_GET_MOUNT_AND_INODE(req->mntid, req->r_ino, rsp);
 
 	rsp->r_len = pfsd_pread_svr(mnt, inode, rbuf, read_len, req->r_off,
-	    req->common_pl_req.pl_btime);
+	    req->common_pl_req.pl_btime, weak);
 
 	PFSD_PUT_MOUNT_AND_INODE(mnt, inode);
 

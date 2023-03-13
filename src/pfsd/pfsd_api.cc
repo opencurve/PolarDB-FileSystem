@@ -286,7 +286,7 @@ pfsd_creat_svr(const char *pbdpath, mode_t m, uint64_t *btime, int32_t *file_typ
 
 static ssize_t
 _pfsd_pread_svr(pfs_mount_t *mnt, pfs_inode_t *in, void *buf, size_t len,
-    off_t offset, uint64_t btime)
+    off_t offset, uint64_t btime, int weak)
 {
 	ssize_t rlen = -1;
 
@@ -294,9 +294,9 @@ _pfsd_pread_svr(pfs_mount_t *mnt, pfs_inode_t *in, void *buf, size_t len,
 		return 0;
 
 	int err;
-	tls_read_begin(mnt);
+	tls_read_begin_ensure(mnt, weak);
 	pfs_inode_lock(in);
-	rlen = pfs_file_read(in, buf, len, offset, true, btime);
+	rlen = pfs_file_read(in, buf, len, offset, true, btime, weak);
 	err = rlen < 0 ? rlen : 0;
 	pfs_inode_unlock(in);
 	tls_read_end(err);
@@ -306,7 +306,7 @@ _pfsd_pread_svr(pfs_mount_t *mnt, pfs_inode_t *in, void *buf, size_t len,
 
 ssize_t
 pfsd_pread_svr(pfs_mount_t *mnt, pfs_inode_t *inode, void *buf, size_t len,
-    off_t off, uint64_t btime)
+    off_t off, uint64_t btime, int weak)
 {
 	assert (mnt && inode && off >= 0);
 
@@ -317,7 +317,7 @@ pfsd_pread_svr(pfs_mount_t *mnt, pfs_inode_t *inode, void *buf, size_t len,
 
 	while (err == -EAGAIN) {
 		PFS_STAT_LATENCY_ENTRY();
-		rlen = _pfsd_pread_svr(mnt, inode, buf, len, off, btime);
+		rlen = _pfsd_pread_svr(mnt, inode, buf, len, off, btime, weak);
 		err = rlen < 0 ? (int)rlen : 0;
 		PFS_STAT_LATENCY(STAT_PFS_API_PREAD_DONE);
 	}

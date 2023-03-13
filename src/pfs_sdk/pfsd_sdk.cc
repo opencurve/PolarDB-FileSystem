@@ -82,7 +82,7 @@ static int s_remount_timeout_ms = 2000 * 1000;
 } while(0)
 
 static ssize_t pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len,
-	off_t off);
+	off_t off, int weak);
 static ssize_t pfsd_file_pwrite(pfsd_file_t *file, const void *buf, size_t len,
 	off_t off);
 static off_t pfsd_file_lseek(pfsd_file_t *file, off_t offset, int whence);
@@ -628,7 +628,7 @@ pfsd_creat(const char *pbdpath, mode_t mode)
 #define OFFSET_FILE_SIZE    (-2)    /* offset is file size */
 
 ssize_t
-pfsd_read(int fd, void *buf, size_t len)
+pfsd_read_impl(int fd, void *buf, size_t len, int weak)
 {
 	pfsd_file_t *file = NULL;
 	char *cbuf = (char *)buf;
@@ -641,7 +641,7 @@ pfsd_read(int fd, void *buf, size_t len)
 		to_read = len;
 		if (to_read > PFSD_MAX_IOSIZE)
 			to_read = PFSD_MAX_IOSIZE;
-		rc = pfsd_file_pread(file, cbuf+total, to_read, file->f_offset);
+		rc = pfsd_file_pread(file, cbuf+total, to_read, file->f_offset, weak);
 		if (rc > 0) {
 			file->f_offset += rc;
 			total += rc;
@@ -657,7 +657,19 @@ pfsd_read(int fd, void *buf, size_t len)
 }
 
 ssize_t
-pfsd_pread(int fd, void *buf, size_t len, off_t off)
+pfsd_read(int fd, void *buf, size_t len)
+{
+	return pfsd_read_impl(fd, buf, len, 0);
+}
+
+ssize_t
+pfsd_read_weak(int fd, void *buf, size_t len)
+{
+	return pfsd_read_impl(fd, buf, len, 1);
+}
+
+ssize_t
+pfsd_pread_impl(int fd, void *buf, size_t len, off_t off, int weak)
 {
 	pfsd_file_t *file = NULL;
 	char *cbuf = (char *)buf;
@@ -669,7 +681,7 @@ pfsd_pread(int fd, void *buf, size_t len, off_t off)
 		to_read = len;
 		if (to_read > PFSD_MAX_IOSIZE)
 			to_read = PFSD_MAX_IOSIZE;		
-		rc = pfsd_file_pread(file, cbuf+total, to_read, off+total);
+		rc = pfsd_file_pread(file, cbuf+total, to_read, off+total, weak);
 		if (rc > 0) {
 			total += rc;
 			len -= rc;
@@ -682,8 +694,20 @@ pfsd_pread(int fd, void *buf, size_t len, off_t off)
 	return err ? err : total; 
 }
 
+ssize_t
+pfsd_pread(int fd, void *buf, size_t len, off_t off)
+{
+	return pfsd_pread_impl(fd, buf, len, off, 0);
+}
+
+ssize_t
+pfsd_pread_weak(int fd, void *buf, size_t len, off_t off)
+{
+	return pfsd_pread_impl(fd, buf, len, off, 1);
+}
+
 static ssize_t
-pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len, off_t off)
+pfsd_file_pread(pfsd_file_t *file, void *buf, size_t len, off_t off, int weak)
 {
 	if (buf == NULL) {
 		errno = EINVAL;
@@ -717,7 +741,7 @@ retry:
 	}
 
 	/* fill request */
-	req->type = PFSD_REQUEST_READ;
+	req->type = weak ? PFSD_REQUEST_READ_WEAK : PFSD_REQUEST_READ;
 	req->r_req.r_ino = file->f_inode;
 	req->r_req.r_len = len;
 	req->r_req.r_off = off2;

@@ -609,6 +609,7 @@ fail:
 	return -1;
 }
 
+#ifdef PFSD_SERVER
 static void chnl_wait_io_shm(struct worker *wk)
 {
 	int fd = wk->w_ctx->ctx_io_sock_fd;
@@ -632,6 +633,7 @@ again:
 	if (rc == -1)
 		goto again;
 }
+#endif
 
 /* server side */
 static int

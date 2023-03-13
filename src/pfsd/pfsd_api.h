@@ -28,7 +28,7 @@ int64_t	pfsd_open_svr(const char *pbdpath, int flags, mode_t,
 	    uint64_t *btime, int32_t *file_type);
 
 ssize_t	pfsd_pread_svr(pfs_mount_t *mnt, pfs_inode_t *inode, void *buf,
-	    size_t len, off_t off, uint64_t btime);
+	    size_t len, off_t off, uint64_t btime, int weak);
 ssize_t	pfsd_pwrite_svr(pfs_mount_t *mnt, pfs_inode_t *inode, int flags,
 	    const void *buf, size_t len, off_t off, ssize_t *file_size, uint64_t btime);
 

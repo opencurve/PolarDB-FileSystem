@@ -85,6 +85,8 @@ pfs_dev_open(pfs_dev_t *dev)
 
 static inline int
 pfs_dev_increase_epoch(pfs_dev_t *dev) {
+    if (NULL == dev->d_ops->dop_increase_epoch)
+	return 0;
     return dev->d_ops->dop_increase_epoch(dev);
 }
 

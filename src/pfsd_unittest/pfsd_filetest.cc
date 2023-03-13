@@ -100,6 +100,20 @@ TEST_F(FileTest, test) {
     EXPECT_EQ(n, 7);
 }
 
+TEST_F(FileTest, pfsd_read_weak) {
+    char buf[] = "1234567";
+    int n = pfsd_write(fd_, buf, 7);
+    EXPECT_EQ(n, 7);
+
+    off_t off = pfsd_lseek(fd_, 0, SEEK_SET);
+    EXPECT_EQ(off, 0);
+
+    memset(buf, 0, sizeof(buf));
+    n = pfsd_read_weak(fd_, buf, 7);
+    EXPECT_EQ(n, 7);
+    EXPECT_EQ(memcmp(buf, "1234567", 7), 0);
+}
+
 TEST_F(FileTest, pfsd_hole_read) {
 	fileobj fo("/" + g_testenv->pbdname_ + "/hole_read", O_CREAT|O_TRUNC);
 	int fd = fo.getfd();

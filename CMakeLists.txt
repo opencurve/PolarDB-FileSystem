@@ -14,7 +14,7 @@
 cmake_minimum_required (VERSION 2.8)
 project(pfsd CXX C ASM)
 set(pfsd_VERSION_MAJOR 2)
-set(pfsd_VERSION_MINOR 1)
+set(pfsd_VERSION_MINOR 2)
 set(pfsd_VERSION_PATCH 5)
 set(pfsd_VERSION 
     ${pfsd_VERSION_MAJOR}.${pfsd_VERSION_MINOR}.${pfsd_VERSION_MATCH})
@@ -23,19 +23,22 @@ include(CheckIncludeFile)
 
 message("compile pfsd for PostgreSQL")
 
+
 set(PKG_DIR "/usr/local/polarstore/pfsd")
-set(CMAKE_BUILD_TYPE "Release")
-#set(CMAKE_BUILD_TYPE "Debug")
+#set default build type to Release
+if (NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+endif()
 
 include(CMakeLists-config.txt)
 
 link_directories(/usr/lib/curve)
 set(CMAKE_INSTALL_RPATH /usr/lib/curve)
-set(CURVE_LIBS -lcbd -lcurve_client -lcurve_common -lcurve_auth -lcurve_concurrent
-    -lnameserver2_proto -ltopology_proto -lchunkserver-protos -lbrpc -lbutil -lbvar
-    -lbthread -lcc_brpc_internal_proto -ljson2pb -lmcpack2pb -lcc_brpc_idl_options_proto
-    -lcommon_proto 
-    -lprotobuf -lprotobuf_lite -lrt -lssl -lcrypto -ldl -lz -lpthread -lleveldb -lgflags -lglog)
+set(CURVE_LIBS cbd curve_client curve_common curve_auth curve_concurrent
+    nameserver2_proto topology_proto chunkserver-protos brpc butil bvar
+    bthread cc_brpc_internal_proto json2pb mcpack2pb cc_brpc_idl_options_proto
+    common_proto 
+    protobuf protobuf_lite rt ssl crypto dl z pthread leveldb gflags glog)
 
 set(COMMON_FLAGS
   -fno-strict-aliasing
@@ -130,7 +133,7 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY pfsd)
 set(CPACK_PACKAGE_VERSION_MAJOR ${pfsd_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${pfsd_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${pfsd_VERSION_PATCH})
-set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${RAW_GIT_DESC}-${pfsd_VERSION_MAJOR}.${pfsd_VERSION_MINOR}.${pfsd_VERSION_PATCH}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-bosondb-${RAW_GIT_DESC}-${pfsd_VERSION_MAJOR}.${pfsd_VERSION_MINOR}.${pfsd_VERSION_PATCH}-${CMAKE_SYSTEM_PROCESSOR}")
 set(CPACK_VERBATIM_VARIABLES TRUE)
 set(CPACK_MONOLITHIC_INSTALL TRUE)
 set(CPACK_PACKAGE_CONTACT "yfxu@")

@@ -559,7 +559,7 @@ out:
 
 static ssize_t
 pfs_file_read(pfs_inode_t *in, void *buf, size_t len, off_t offset,
-    bool locked, uint64_t btime)
+    bool locked, uint64_t btime, int weak)
 {
 	char		*data = (char *)buf;
 	pfs_mount_t	*mnt = in->in_mnt;
@@ -1009,7 +1009,7 @@ pfs_file_xpread(pfs_file_t *file, void *buf, size_t len, off_t off)
 	rlen = -1;
 	tls_read_begin(mnt);
 	pfs_inode_lock(in);
-	rlen = pfs_file_read(in, buf, len, off2, true, file->f_btime);
+	rlen = pfs_file_read(in, buf, len, off2, true, file->f_btime, false);
 	err = rlen < 0 ? rlen : 0;
 	pfs_inode_unlock(in);
 	tls_read_end(err);
@@ -1185,7 +1185,7 @@ pfs_file_pread(pfs_file_t *file, void *buf, size_t len, off_t off)
 	ssize_t n;
 	MNT_STAT_BEGIN();
 	pfs_tls_set_stat_file_type(file->f_type);
-	n = pfs_file_read(in, buf, len, off, false, INNER_FILE_BTIME);
+	n = pfs_file_read(in, buf, len, off, false, INNER_FILE_BTIME, false);
 	MNT_STAT_END(MNT_STAT_FILE_READ);
 	MNT_STAT_API_END_BANDWIDTH(MNT_STAT_API_PREAD, len);
 	return n;

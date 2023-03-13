@@ -100,6 +100,10 @@ void		pfs_tls_set_ioq(int devi, pfs_ioq_t *ioq);
 		bool _needsync = pfs_mount_needsync(mnt);		\
 		tls_read_begin_flags(mnt, _needsync)
 
+#define	tls_read_begin_ensure(mnt, weak)				\
+		bool _needsync = (weak) ? false : pfs_mount_needsync(mnt);\
+		tls_read_begin_flags(mnt, _needsync)
+
 #define	tls_read_end(err) 						\
 		pfs_meta_unlock(_mnt);					\
 		_err = err;						\
