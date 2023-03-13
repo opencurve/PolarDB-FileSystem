@@ -18,7 +18,7 @@
 
 #define FILE_COLOR_TYPE_NCOUNT 2
 
-#define PGSQL
+//#define PGSQL
 
 #ifndef PGSQL
 
