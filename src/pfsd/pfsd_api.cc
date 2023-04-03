@@ -294,7 +294,7 @@ _pfsd_pread_svr(pfs_mount_t *mnt, pfs_inode_t *in, void *buf, size_t len,
 		return 0;
 
 	int err;
-	tls_read_begin_ensure(mnt, weak);
+	tls_read_begin_order(mnt, weak);
 	pfs_inode_lock(in);
 	rlen = pfs_file_read(in, buf, len, offset, true, btime, weak);
 	err = rlen < 0 ? rlen : 0;
