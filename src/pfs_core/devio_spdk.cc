@@ -285,6 +285,14 @@ bdev_poll(void *arg)
     return 0;
 }
 
+static void
+remove_cb(void *cb_ctx, struct spdk_nvme_ctrlr *ctrlr)
+{
+    pfs_spdk_dev_t *dkdev = (pfs_spdk_dev_t *)cb_ctx;
+    pfs_etrace("spdk nvme disk %s is removed", dkdev->dk_path);
+    abort();
+}
+
 static void *
 bdev_thread_msg_loop(void *arg)
 {
@@ -298,6 +306,10 @@ bdev_thread_msg_loop(void *arg)
     spdk_set_thread(spdk_thread);
     thread_name = spdk_thread_get_name(spdk_thread);
     pthread_setname_np(pthread_self(), thread_name);
+
+    if (dkdev->dk_ctrlr) {
+        spdk_nvme_ctrlr_set_remove_cb(dkdev->dk_ctrlr, remove_cb, dkdev);              
+    }
 
     if (FLAGS_pfs_spdk_driver_auto_bind_cpu) {
         err = pthread_setaffinity_np(pthread_self(), sizeof(dkdev->dk_cpuset),
@@ -340,6 +352,10 @@ bdev_thread_msg_loop(void *arg)
         pfs_spdk_dev_pull_iocb(dkdev);
     }
     __atomic_store_n(&dkdev->dk_running, 0, __ATOMIC_RELAXED);
+
+    if (dkdev->dk_ctrlr) {
+        spdk_nvme_ctrlr_set_remove_cb(dkdev->dk_ctrlr, NULL, NULL);
+    }
 
     spdk_set_thread(NULL);
     if (FLAGS_pfs_spdk_driver_poll_delay)
