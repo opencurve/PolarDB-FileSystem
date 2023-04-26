@@ -1007,6 +1007,7 @@ pfs_spdk_dev_wait_io(pfs_dev_t *dev, pfs_ioq_t *ioq, pfs_devio_t *io)
                 break;
             }
 
+#if 0
             struct timespec ts;
             clock_gettime(CLOCK_REALTIME, &ts);
             struct timespec timeout = {FLAGS_pfs_waitio_timeout_sec, 0};
@@ -1015,6 +1016,9 @@ pfs_spdk_dev_wait_io(pfs_dev_t *dev, pfs_ioq_t *ioq, pfs_devio_t *io)
             if (err) {
 		        pfs_fatal("wait io time runing out, err:%d/n", err);
             }
+#else
+            pfs_event_wait(&dkioq->dkq_done_ev);
+#endif
             for (iocb = __atomic_exchange_n(&dkioq->dkq_done_q, NULL,
                     __ATOMIC_ACQUIRE); iocb; iocb = next) {
                 next = iocb->cb_next;
