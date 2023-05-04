@@ -315,7 +315,10 @@ chnl_close_shm_svr(chnl_ctx_shm_t *ctx, const char *filename, uint32_t name_len,
 
 	if (!force_umount) {
 		result = TEMP_FAILURE_RETRY(flock(fd, LOCK_EX | LOCK_NB));
-
+		if (result < 0 && errno == EWOULDBLOCK) {
+			usleep(10000);
+		}
+		result = TEMP_FAILURE_RETRY(flock(fd, LOCK_EX | LOCK_NB));
 		if (result < 0 && errno == EWOULDBLOCK) {
 			pfsd_warn("when close chnl, can't flock %s, "
 			    "may be it's alive", filename);
