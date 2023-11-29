@@ -14,6 +14,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include "pfs_spdk.h"
+#include "pfs_spdk_api.h"
 #include "pfs_api.h"
 #include "pfs_option.h"
 
@@ -23,6 +24,7 @@ DEFINE_string(cluster, "", "cluster name");
 DEFINE_int32(host_id, 1, "hosit id");
 DEFINE_string(pbd_name, "", "pbdname name");                       
 DEFINE_string(spdk_nvme_controller, "", "nvme controller");                       
+DEFINE_int32(pbd_cpu_id, -1, "pbd cpu id");
 
 extern int                                                                             
 pfs_spdk_dev_io_get_cpu_stats(const char *devname,                              
@@ -46,12 +48,15 @@ int main(int argc, char **argv)
 		std::cout << "pbd_name is empty";
 		return 1;
 	}
+	if (FLAGS_pbd_cpu_id != -1) {
+		pfs_spdk_set_devcpu_bind(FLAGS_pbd_name.c_str(), FLAGS_pbd_cpu_id);
+	}
 
-        if (pfs_spdk_setup()) {
+	if (pfs_spdk_setup()) {
 		std::cerr << "can not init spdk";
-                return 1;
-        }
-	                                                                               
+		return 1;
+	}
+
 	int flags = MNTFLG_TOOL | MNTFLG_RDWR | MNTFLG_LOG;
 	int rc = pfs_mount(cluster.c_str(), pbdname.c_str(), hostid, flags);
 	if (rc < 0) {                                                              

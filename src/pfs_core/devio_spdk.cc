@@ -133,9 +133,6 @@ PFS_OPTION_REG2(pfs_spdk_driver_error_interval, FLAGS_pfs_spdk_driver_error_inte
 static int FLAGS_pfs_spdk_driver_auto_dma;
 PFS_OPTION_REG2(pfs_spdk_driver_auto_dma, FLAGS_pfs_spdk_driver_auto_dma,
 	OPT_INT, 1, OPT_INT);
-static int FLAGS_pfs_spdk_driver_auto_bind_cpu;
-PFS_OPTION_REG2(pfs_spdk_driver_auto_bind, FLAGS_pfs_spdk_driver_auto_bind_cpu,
-	OPT_INT, 0, OPT_INT);
 
 #define PFS_MAX_CACHED_SPDK_IOCB        128
 static __thread SLIST_HEAD(, pfs_spdk_iocb) tls_free_iocb = SLIST_HEAD_INITIALIZER(tls_free_iocb);
@@ -247,22 +244,18 @@ bdev_event_cb(enum spdk_bdev_event_type type, struct spdk_bdev *bdev,
     return;
 }
 
-static int
+static void
 bdev_find_cpuset(pfs_spdk_dev_t *dkdev)
 {
     pfs_dev_t *dev = &dkdev->dk_base;
-    int err = 0;
+    int cpuid = -1;
 
-    err = pfs_get_dev_local_cpus(dkdev->dk_bdev, &dkdev->dk_cpuset);
-    if (err == 0) {
-        dev->d_mem_socket_id = pfs_cpuset_socket_id(&dkdev->dk_cpuset);
-        pfs_itrace("device %s's local cpu socket is %d", dev->d_devname,
-                   dev->d_mem_socket_id);
-    } else {
-        pfs_etrace("cannot get device %s's local cpuset", dev->d_devname);
+    CPU_ZERO(&dkdev->dk_cpuset);
+    cpuid = pfs_spdk_get_devcpu_bind(dev->d_devname);
+    if (cpuid != -1) {
+        CPU_SET(cpuid, &dkdev->dk_cpuset);
+        //dev->d_mem_socket_id = pfs_cpuset_socket_id(&dkdev->dk_cpuset);
     }
-
-    return err;
 }
 
 static unsigned 
@@ -299,14 +292,14 @@ bdev_thread_msg_loop(void *arg)
     thread_name = spdk_thread_get_name(spdk_thread);
     pthread_setname_np(pthread_self(), thread_name);
 
-    if (FLAGS_pfs_spdk_driver_auto_bind_cpu) {
+    if (CPU_COUNT(&dkdev->dk_cpuset)) {
         err = pthread_setaffinity_np(pthread_self(), sizeof(dkdev->dk_cpuset),
              &dkdev->dk_cpuset);
         if (err)
             pfs_etrace("pthread_setaffinity_np failed, %s", strerror(err));
         else {
             char *cpuset_str = pfs_cpuset_to_string(&dkdev->dk_cpuset);
-            pfs_etrace("thread %s binds to cpus: %s", thread_name, cpuset_str);
+            pfs_etrace("thread %s binds to cpus: [ %s ]", thread_name, cpuset_str);
             free(cpuset_str);
         }
     }

@@ -141,6 +141,53 @@ static pthread_t g_gc_thread_id = 0;
 static bool g_spdk_env_initialized = false;
 static struct pfs_spdk_driver_poller spdk_driver_poller = { NULL, NULL, NULL };
 
+struct devcpu {
+	char *devname;
+	int cpuid;
+	TAILQ_ENTRY(devcpu) link;
+};
+
+static TAILQ_HEAD(,devcpu) g_dev_list =
+	TAILQ_HEAD_INITIALIZER(g_dev_list);
+
+static pthread_mutex_t g_devcpu_mtx = PTHREAD_MUTEX_INITIALIZER;
+
+void
+pfs_spdk_set_devcpu_bind(const char *devname, int cpuid)
+{
+    struct devcpu *d;
+
+    pthread_mutex_lock(&g_devcpu_mtx);
+    TAILQ_FOREACH(d, &g_dev_list, link) {
+        if (strcmp(d->devname, devname) == 0) {
+            d->cpuid = cpuid;
+            pthread_mutex_unlock(&g_devcpu_mtx);
+            return;
+        }
+    }
+    d = (struct devcpu *)malloc(sizeof(*d));
+    d->devname = strdup(devname);
+    d->cpuid = cpuid;	
+    TAILQ_INSERT_TAIL(&g_dev_list, d, link);
+    pthread_mutex_unlock(&g_devcpu_mtx);
+}
+
+int
+pfs_spdk_get_devcpu_bind(const char *devname)
+{
+    struct devcpu *d;
+    int cpuid = -1;
+    pthread_mutex_lock(&g_devcpu_mtx);
+    TAILQ_FOREACH(d, &g_dev_list, link) {
+        if (strcmp(d->devname, devname) == 0) {
+            cpuid = d->cpuid;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_devcpu_mtx);
+    return cpuid;
+}
+
 static char *
 safe_strdup(const char *p)
 {

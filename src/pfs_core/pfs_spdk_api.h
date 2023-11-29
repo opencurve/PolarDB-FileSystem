@@ -21,7 +21,7 @@
  */
 
 #ifndef _PFS_SPDK_API_H
-#define _PFS_SKDK_API_H
+#define _PFS_SPDK_API_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +38,8 @@ struct pfs_spdk_driver_poller {
 
 void pfs_spdk_set_driver_poller(const struct pfs_spdk_driver_poller *);
 void pfs_spdk_get_driver_poller(struct pfs_spdk_driver_poller *);
+void pfs_spdk_set_devcpu_bind(const char *devname, int cpuid);
+int pfs_spdk_get_devcpu_bind(const char *devname);
 
 #ifdef __cplusplus
 }
